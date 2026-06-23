@@ -193,7 +193,7 @@ function serveHtml(htmlProvider, port) {
         res.end(JSON.stringify(STATE));
       } else {
         let html = htmlProvider();
-        html = html.split("{{BOT_NAME}}").join(STATE.bot || "Notetaker")
+        html = html.split("{{BOT_NAME}}").join(STATE.bot || "AgentCall")
                    .split("{{AVATAR_LINES}}").join(String(CONFIG.AVATAR_LINES || 8));
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(html);
@@ -215,8 +215,13 @@ async function run(meetUrl, botName, display) {
   let uiPort = 0;
   if (display !== "audio") {
     const provider = avatarProvider(display);
-    if (provider) { const r = await serveHtml(provider, 0); uiPort = r.port; }
-    if (!uiPort) { console.log(`Avatar '${display}' unavailable - using audio only.`); display = "audio"; }
+    if (!provider) {
+      console.log(`Avatar '${display}' not found — add avatars/${display}.html or avatars/${display}.<image> (png/jpg/gif/svg/webp). Using audio for now.`);
+      display = "audio";
+    } else {
+      const r = await serveHtml(provider, 0); uiPort = r.port;
+      if (!uiPort) { console.log(`Couldn't start the avatar server for '${display}' — using audio for now.`); display = "audio"; }
+    }
   }
 
   return new Promise((resolve) => {

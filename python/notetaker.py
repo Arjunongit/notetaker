@@ -240,7 +240,7 @@ def _make_handler(html_provider):
                 ctype = "application/json"
             else:
                 html = html_provider()
-                html = html.replace("{{BOT_NAME}}", str(STATE.get("bot", "Notetaker")))
+                html = html.replace("{{BOT_NAME}}", str(STATE.get("bot", "AgentCall")))
                 html = html.replace("{{AVATAR_LINES}}", str(CONFIG.get("AVATAR_LINES", 8)))
                 body = html.encode("utf-8")
                 ctype = "text/html; charset=utf-8"
@@ -273,11 +273,15 @@ def run(meet_url, bot_name, display):
     ui_port = 0
     if display != "audio":
         provider = _avatar_provider(display)
-        if provider:
-            _, ui_port = serve_html(provider, 0)
-        if not ui_port:
-            print(f"Avatar '{display}' unavailable - using audio only.")
+        if not provider:
+            print(f"Avatar '{display}' not found — add avatars/{display}.html or "
+                  f"avatars/{display}.<image> (png/jpg/gif/svg/webp). Using audio for now.")
             display = "audio"
+        else:
+            _, ui_port = serve_html(provider, 0)
+            if not ui_port:
+                print(f"Couldn't start the avatar server for '{display}' — using audio for now.")
+                display = "audio"
 
     cmd = bridge_command(display) + [meet_url, "--name", bot_name]
     if CONFIG["ALONE_SECONDS"] and CONFIG["ALONE_SECONDS"] > 0:

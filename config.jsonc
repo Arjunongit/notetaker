@@ -4,10 +4,10 @@
   //  One config, shared by both the Python and Node notetaker. (JSON + comments.)
   // ══════════════════════════════════════════════════════════════════════════
 
-  // Your notetaker's name. Run the builder to set this up interactively —
+  // Your notetaker's name (shown in the meeting). Set it via the builder —
   //   python build.py     (or)     npm run build
-  // — or just fill it in here. Short & distinctive (STT mishears long names:
-  // "Notetaker" can come out as "No taker"). Left blank = "not built yet".
+  // — or just fill it in here. Keep it short & distinctive; speech-to-text can
+  // mishear long names. Left blank = "not built yet" (builder default: "AgentCall").
   "BOT_NAME": "",
 
   // Where notes are saved, and in what format. A relative path is saved at the
@@ -27,12 +27,12 @@
   "WEB_PORT": 8080,
 
   // The bot's video tile (its "camera" in the meeting):
-  //   "audio"      — no video, just listens. Lightest & most reliable.
-  //   "pattern"    — the Pattern radial-sunburst mark.
-  //   "ring"       — a glowing neon ring.
-  //   "transcript" — the live transcript, on screen in the call.
+  //   "audio"      — no video, just listens. Lightest & cheapest — the default.
+  //   "pattern"    — the Pattern AI Labs logo.        ┐ on-camera = video mode,
+  //   "ring"       — a glowing neon ring.             │ a touch more per hour than
+  //   "transcript" — the live transcript, on screen.  ┘ audio, so they're opt-in.
   // To use your OWN avatar, drop a file in avatars/ and set DISPLAY to its name:
   // a raw image (avatars/me.png / .jpg / .gif / .svg) OR an HTML page (avatars/me.html).
-  "DISPLAY": "pattern",
+  "DISPLAY": "audio",
   "AVATAR_LINES": 8             // transcript tile: how many recent lines to show
 }

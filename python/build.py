@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Build your notetaker — assembles YOUR config.
+"""Build your notetaker — the one-time setup that assembles YOUR config.
 
-In a terminal (cmd, VS Code, Cursor, Replit, bash...), just run it and answer:
+In a terminal (cmd, PowerShell, VS Code, Cursor, Replit, bash...), just run it and answer:
     python build.py
 
-No terminal (an AI agent, CI, a script)? Pass the answers as flags instead:
-    python build.py --name Juno --display ring --format md --key ak_ac_...
-    python build.py --name Juno --image ./logo.png        # your own avatar
+No terminal (an AI agent, CI, a script)? Pass the answers as flags instead — key first:
+    python build.py --key ak_ac_... --name Juno --display ring --format md
+    python build.py --key ak_ac_... --image ./logo.png        # your own avatar
 
-Either way it writes config.jsonc + .env at the repo root. Powered by AgentCall.
+Either way it writes .env (your key, gitignored) + config.jsonc at the repo root.
+After this one-time build you can just edit config.jsonc directly. Powered by AgentCall.
 """
 
 import argparse
+import json
 import os
 import re
 import shutil
@@ -43,44 +45,91 @@ def _enable_ansi():
 
 
 _ANSI = _enable_ansi()
-CYAN, GREEN, DIM, BOLD = "36", "32", "2", "1"
+BOLD, DIM = "1", "2"
+
+# AgentCall brand (truecolor). Unsupported terminals ignore these and fall back
+# to default text — readable everywhere, never garbled.
+_E = "\033["
+_R = _E + "0m"
+_INK = _E + "38;2;28;29;26m"        # ink text on the cream card
+_MUTE = _E + "38;2;120;118;108m"    # muted text on the cream card
+_CREAM = _E + "48;2;243;240;232m"   # #F3F0E8 paper — the card surface
+_LIMEBG = _E + "48;2;200;255;58m"   # #C8FF3A lime — the badge surface
+_ONLIME = _E + "38;2;12;13;10m"     # near-black text on lime
+_CARD_W = 46
 
 
 def col(code, s):
     return f"\033[{code}m{s}\033[0m" if _ANSI else s
 
 
-def _row(colored, plain, w):
-    pad = " " * max(0, w - 1 - len(plain))
-    return col(CYAN, "  │") + " " + colored + pad + col(CYAN, "│")
+def _emit_card(rows):
+    """Render a cream 'paper' card. Brand colors live only here (non-interactive,
+    so no input echo to fight); plain text is the graceful fallback."""
+    if not _ANSI:
+        print()
+        for _, plain in rows:
+            if plain:
+                print("  " + plain)
+        print()
+        return
+    blank = "  " + _CREAM + " " * _CARD_W + _R
+    print()
+    print(blank)
+    for styled, plain in rows:
+        pad = " " * max(0, _CARD_W - 2 - len(plain))
+        print("  " + _CREAM + _INK + "  " + styled + pad + _R)
+    print(blank)
+    print()
+
+
+def _pill(text):
+    # lime badge: lime background, near-black bold text, then back to the cream card
+    styled = _LIMEBG + _ONLIME + _E + "1m" + " " + text + " " + _R + _CREAM + _INK
+    return styled, " " + text + " "
 
 
 def banner():
-    w = 48
-    print()
-    print(col(CYAN, "  ╭" + "─" * w + "╮"))
-    print(_row(col(BOLD, "◆  N O T E T A K E R"), "◆  N O T E T A K E R", w))
-    print(_row(col(DIM, "build your own  ·  powered by AgentCall"),
-               "build your own  ·  powered by AgentCall", w))
-    print(col(CYAN, "  ╰" + "─" * w + "╯"))
+    title = _E + "1m" + "▣  N O T E T A K E R" + _R + _CREAM + _INK
+    sub = _MUTE + "build it once · powered by agentcall.dev" + _R + _CREAM
+    _emit_card([
+        _pill("ONE-TIME SETUP"),
+        ("", ""),
+        (title, "▣  N O T E T A K E R"),
+        (sub, "build it once · powered by agentcall.dev"),
+    ])
 
 
-def ask(label, default=""):
-    hint = col(DIM, f" [{default}]") if default else ""
+def _done_card(name):
+    ready = _E + "1m" + "✓  " + name + " is ready" + _R + _CREAM + _INK
+    sub = _MUTE + "config.jsonc + .env are written" + _R + _CREAM
+    _emit_card([
+        _pill("BUILT"),
+        ("", ""),
+        (ready, "✓  " + name + " is ready"),
+        (sub, "config.jsonc + .env are written"),
+    ])
+
+
+def _prompt():
     try:
-        val = input(f"  {label}{hint} " + col(CYAN, "› ")).strip()
+        return input("  " + col(BOLD, "›") + " ").strip()
     except (EOFError, KeyboardInterrupt):
         print("\n  Build cancelled.")
         sys.exit(1)
-    return val or default
 
 
-def choose(label, options, default):
-    print(f"\n  {col(BOLD, label)}")
+def ask(question, hint="", default=""):
+    print(f"\n  {col(BOLD, question)}" + (f"  {col(DIM, hint)}" if hint else ""))
+    return _prompt() or default
+
+
+def choose(question, options, default):
+    print(f"\n  {col(BOLD, question)}")
     for i, (key, desc) in enumerate(options, 1):
-        star = col(CYAN, "  ‹ default") if key == default else ""
-        print(f"    {col(CYAN, str(i))}) {key:11s}{col(DIM, desc)}{star}")
-    raw = ask("choose", default)
+        mark = col(DIM, "  (default)") if key == default else ""
+        print(f"    {col(BOLD, str(i))}  {key.ljust(11)}{col(DIM, desc)}{mark}")
+    raw = _prompt()
     if raw.isdigit() and 1 <= int(raw) <= len(options):
         return options[int(raw) - 1][0]
     for key, _ in options:
@@ -98,20 +147,23 @@ def copy_image(path, name):
     path = os.path.expanduser((path or "").strip().strip('"').strip("'"))
     ext = os.path.splitext(path)[1].lower()
     if not path or not os.path.isfile(path) or ext not in _IMG_EXTS:
-        print(f"  (couldn't use image '{path}' — falling back to the Pattern mark)")
+        print(f"   (couldn't use image '{path}' — falling back to the Pattern mark)")
         return "pattern"
     dest = slug(name)
     try:
         shutil.copyfile(path, os.path.join(_AVATARS, dest + ext))
-        print(col(GREEN, "     ✓ ") + f"copied your image to avatars/{dest}{ext}")
+        print("   " + col(BOLD, "✓") + f" copied your image to avatars/{dest}{ext}")
         return dest
     except Exception as e:
-        print(f"  (couldn't copy: {e} — using the Pattern mark)")
+        print(f"   (couldn't copy: {e} — using the Pattern mark)")
         return "pattern"
 
 
 def set_value(text, key, value):
-    return re.sub(rf'("{key}"\s*:\s*)"[^"]*"', lambda m: m.group(1) + f'"{value}"', text, count=1)
+    # json.dumps escapes quotes/backslashes/control chars so any name stays valid JSON;
+    # the value pattern allows backslash-escapes so a re-run matches a previously-escaped value.
+    return re.sub(rf'("{key}"\s*:\s*)"(?:[^"\\]|\\.)*"',
+                  lambda m: m.group(1) + json.dumps(value, ensure_ascii=False), text, count=1)
 
 
 def write_config(name, display, fmt):
@@ -125,75 +177,132 @@ def write_config(name, display, fmt):
         f.write(text)
 
 
+def _existing_key():
+    """A key the notetaker could already use — env var, an existing .env, or
+    ~/.agentcall/config.json. Lets the build skip re-asking when one's already set."""
+    k = os.environ.get("AGENTCALL_API_KEY", "").strip()
+    if k:
+        return k
+    p = os.path.join(_ROOT, ".env")
+    if os.path.isfile(p):
+        try:
+            with open(p, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("AGENTCALL_API_KEY="):
+                        v = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if v:
+                            return v
+        except OSError:
+            pass
+    cfg = os.path.join(os.path.expanduser("~"), ".agentcall", "config.json")
+    if os.path.isfile(cfg):
+        try:
+            import json
+            with open(cfg, encoding="utf-8") as f:
+                v = (json.load(f) or {}).get("api_key", "")
+                if v:
+                    return v
+        except (OSError, ValueError):
+            pass
+    return ""
+
+
 def write_env(key):
-    with open(os.path.join(_ROOT, ".env"), "w", encoding="utf-8") as f:
+    """Write the gitignored .env with the AgentCall key. Only called once we have one."""
+    p = os.path.join(_ROOT, ".env")
+    with open(p, "w", encoding="utf-8") as f:
         f.write(f"AGENTCALL_API_KEY={key}\n")
+    if os.name != "nt":  # keep the secret owner-only on POSIX (no-op on Windows)
+        try:
+            os.chmod(p, 0o600)
+        except OSError:
+            pass
 
 
 def assemble(name, display, fmt, key):
-    print(col(CYAN, "\n  ⚙  ") + col(BOLD, f"Building {name}") + col(DIM, " ..."))
-    print(col(GREEN, "     ✓ ") + "wired the listener (AgentCall bridge)")
-    print(col(GREEN, "     ✓ ") + f"set the '{display}' face")
+    print()
+    print("  " + col(BOLD, f"Building {name}") + col(DIM, " …"))
+    print("   " + col(BOLD, "✓") + " wired the AgentCall listener")
+    print("   " + col(BOLD, "✓") + f' set the "{display}" face')
     write_config(name, display, fmt)
-    print(col(GREEN, "     ✓ ") + "wrote config.jsonc")
+    print("   " + col(BOLD, "✓") + " wrote config.jsonc")
     if key:
         write_env(key)
-        print(col(GREEN, "     ✓ ") + "saved your key to .env")
-    print(col(f"{GREEN};{BOLD}", f"\n  ✦  Done — you built {name}."))
-    if not key:
-        print(col(DIM, "     add your key: copy .env.example to .env and paste it in"))
-    print(col(DIM, "     launch:") + ' python notetaker.py "https://meet.google.com/your-link"\n')
+        print("   " + col(BOLD, "✓") + " saved your key to .env")
+    else:
+        print("   " + col(BOLD, "✓") + " using the AgentCall key already set")
+
+    _done_card(name)
+    print("  " + col(BOLD, "Run it:") + '  python notetaker.py "https://meet.google.com/your-link"')
+    print("  " + col(DIM, "Edit config.jsonc anytime to change the name, face, or format · your key stays in .env."))
+    print("  " + col(DIM, "Custom on-camera image? Drop it in avatars/ and set DISPLAY to its name."))
+    print()
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Build your notetaker. No flags in a terminal = interactive; "
                     "pass flags for non-interactive / AI-agent / CI use.")
+    parser.add_argument("--key", help="your AgentCall API key (written to .env)")
     parser.add_argument("--name")
     parser.add_argument("--display", help="audio | pattern | ring | transcript | <your avatar name>")
     parser.add_argument("--format", choices=["md", "txt", "json"])
     parser.add_argument("--image", help="path to a logo/photo to use as the avatar")
-    parser.add_argument("--key", help="your AgentCall API key")
     args = parser.parse_args()
 
-    has_flags = any([args.name, args.display, args.format, args.image, args.key])
+    has_flags = any([args.key, args.name, args.display, args.format, args.image])
 
     if not has_flags and not sys.stdin.isatty():
         print("This builder asks you questions, but there's no terminal here")
-        print("(an AI agent, CI, or piped input). Two ways to build instead:\n")
-        print("  1) Pass the answers as flags:")
-        print("       python build.py --name Juno --display ring --format md --key ak_ac_...")
-        print("       (--display can be audio/pattern/ring/transcript, or --image ./logo.png)")
-        print("  2) Edit config.jsonc directly (BOT_NAME, DISPLAY, OUTPUT_FORMAT), key in .env.\n")
+        print("(an AI agent, CI, or piped input). Run it non-interactively with flags:\n")
+        print("  python build.py --key ak_ac_... --name Juno --display audio --format md")
+        print("  (--display: audio | pattern | ring | transcript, or --image ./logo.png)")
+        print("  A key is required: --key, or AGENTCALL_API_KEY / ~/.agentcall/config.json.\n")
         sys.exit(0)
 
     banner()
 
     if has_flags:
-        name = args.name or "Scribe"
-        display = copy_image(args.image, name) if args.image else (args.display or "pattern")
+        name = args.name or "AgentCall"
+        display = copy_image(args.image, name) if args.image else (args.display or "audio")
         fmt = args.format or "md"
         key = args.key or ""
     else:
-        print(col(DIM, "\n  Four quick choices and it's yours.\n"))
-        name = ask("1 · name it", "Scribe")
-        face = choose("2 · its face on camera", [
-            ("pattern", "the Pattern sunburst mark"),
+        print(col(DIM, "  A few quick questions and it's yours."))
+        if _existing_key():
+            print("  " + col(BOLD, "✓") + col(DIM, " found your AgentCall key already set — using it."))
+            key = ""
+        else:
+            key = ""
+            while not key:
+                key = ask("First — paste your AgentCall key",
+                          "free at app.agentcall.dev/api-keys · Ctrl-C to cancel")
+                if not key:
+                    print("  " + col(DIM, "A key is required to run the notetaker — paste it, or Ctrl-C to cancel."))
+        name = ask("Name your notetaker", "e.g. Juno · enter to keep AgentCall", "AgentCall")
+        face = choose("How should it show up on camera?", [
+            ("audio", "no tile — lightest & cheapest"),
+            ("pattern", "the Pattern AI Labs logo"),
             ("ring", "a glowing neon ring"),
-            ("transcript", "the live transcript on screen"),
-            ("audio", "no video, just listens (lightest)"),
-            ("image", "your own logo/photo"),
-        ], "pattern")
+            ("transcript", "the live transcript, on screen"),
+            ("image", "your own logo or photo"),
+        ], "audio")
         if face == "image":
-            ipath = ask("    path to your image (png/jpg/gif/svg/webp), blank to skip")
+            ipath = ask("Where's your image?", "png · jpg · gif · svg · webp  (enter to skip)")
             display = copy_image(ipath, name) if ipath else "pattern"
         else:
             display = face
-        fmt = choose("3 · save notes as", [
+        fmt = choose("How should it save the notes?", [
             ("md", "Markdown"), ("txt", "plain text"), ("json", "JSON"),
         ], "md")
+
+    if not (key or _existing_key()):
         print()
-        key = ask("4 · your AgentCall key (free at app.agentcall.dev/api-keys; blank to add later)")
+        print("  An AgentCall key is required — the notetaker can't run without one.")
+        print("  Pass --key ak_ac_...  (free at app.agentcall.dev/api-keys),")
+        print("  or set AGENTCALL_API_KEY, or add it to .env, then build again.")
+        sys.exit(1)
 
     assemble(name, display, fmt, key)
 
