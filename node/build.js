@@ -128,7 +128,9 @@ function setValue(text, key, value) {
 
 function writeConfig(name, display, fmt) {
   const p = path.join(ROOT, "config.jsonc");
-  let text = fs.readFileSync(p, "utf-8");
+  // On the first build there's no config.jsonc yet — seed it from the committed template.
+  const src = fs.existsSync(p) ? p : path.join(ROOT, "config.default.jsonc");
+  let text = fs.readFileSync(src, "utf-8");
   text = setValue(text, "BOT_NAME", name);
   text = setValue(text, "DISPLAY", display);
   text = setValue(text, "OUTPUT_FORMAT", fmt);
@@ -229,7 +231,7 @@ async function interactive() {
   }
   const name = await ask("Name your notetaker", "e.g. Juno · enter to keep AgentCall", "AgentCall");
   const face = await choose("How should it show up on camera?", [
-    ["audio", "no tile — lightest & cheapest"],
+    ["audio", "no video — just listens"],
     ["pattern", "the Pattern AI Labs logo"],
     ["ring", "a glowing neon ring"],
     ["transcript", "the live transcript, on screen"],

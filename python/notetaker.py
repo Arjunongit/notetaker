@@ -33,9 +33,12 @@ _REPO_ROOT = os.path.dirname(_HERE)  # config.jsonc, notes/, avatars/ and .env l
 
 
 def _load_config():
-    """Read config.jsonc from the repo root — one file, shared by python and node.
-    It's JSON with // and /* */ comments; strip the comments, then parse."""
+    """Read config.jsonc (the builder creates it) from the repo root, or fall back to
+    config.default.jsonc before the first build. JSON with // and /* */ comments;
+    strip the comments, then parse."""
     p = os.path.join(_REPO_ROOT, "config.jsonc")
+    if not os.path.isfile(p):
+        p = os.path.join(_REPO_ROOT, "config.default.jsonc")
     try:
         with open(p, encoding="utf-8") as fh:
             text = fh.read()
@@ -43,8 +46,8 @@ def _load_config():
                       lambda m: m.group(1) or "", text, flags=re.S)
         return json.loads(text)
     except Exception as e:
-        print(f"Couldn't read config.jsonc ({e}). Check it for typos "
-              "(trailing commas, missing quotes).")
+        print(f"Couldn't read config ({e}). Run the builder (python build.py), or "
+              "check config.jsonc for typos (trailing commas, missing quotes).")
         sys.exit(1)
 
 
@@ -433,6 +436,7 @@ def run(meet_url, bot_name, display):
                 break
     except KeyboardInterrupt:
         end_reason = "interrupted"
+        print("\nLeaving the meeting… (this can take a few seconds)")
     finally:
         send_leave()
         # Capture the call id (the bridge is still alive — it's in its own process
@@ -483,7 +487,9 @@ def run(meet_url, bot_name, display):
             print(f"\nSaved {len(transcript)} lines to: {notes.finalize(transcript, meta)}")
         else:
             print("\nNo transcript captured - nothing to save.")
-            if joined_at is None:
+            if end_reason == "interrupted":
+                print("(Stopped before the bot finished joining — nothing was captured.)")
+            elif joined_at is None:
                 print("The bridge exited before joining. Its output:")
                 _keys = ("error", "cannot find", "no module", "not found", "traceback", "exception")
                 hot = [l for l in err_tail if any(k in l.lower() for k in _keys)]

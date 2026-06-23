@@ -1,7 +1,7 @@
 {
   // ══════════════════════════════════════════════════════════════════════════
-  //  YOUR NOTETAKER — the only file you need to edit.
-  //  One config, shared by both the Python and Node notetaker. (JSON + comments.)
+  //  Notetaker config (JSON + comments, shared by python & node).
+  //  Edit config.jsonc — the builder creates it from this default on first build.
   // ══════════════════════════════════════════════════════════════════════════
 
   // Your notetaker's name (shown in the meeting). Set it via the builder —
@@ -18,7 +18,7 @@
   // Also save meeting chat messages, not just speech.
   "CAPTURE_CHAT": true,
 
-  // Leave the instant the last human leaves (so it never bills an empty room).
+  // Leave the instant the last human leaves, so it never lingers in an empty room.
   "LEAVE_WHEN_EMPTY": true,
   "ALONE_SECONDS": 30,          // safety net: the bridge also leaves after this long alone
 
@@ -27,10 +27,11 @@
   "WEB_PORT": 8080,
 
   // The bot's video tile (its "camera" in the meeting):
-  //   "audio"      — no video, just listens. Lightest & cheapest — the default.
-  //   "pattern"    — the Pattern AI Labs logo.        ┐ on-camera = video mode,
-  //   "ring"       — a glowing neon ring.             │ a touch more per hour than
-  //   "transcript" — the live transcript, on screen.  ┘ audio, so they're opt-in.
+  //   "audio"      — no video, just listens. Lightest & most reliable — the default.
+  //   "pattern"    — the Pattern AI Labs logo.
+  //   "ring"       — a glowing neon ring.
+  //   "transcript" — the live transcript, on screen.
+  // Audio is the default; the on-camera options are opt-in (they use video mode).
   // To use your OWN avatar, drop a file in avatars/ and set DISPLAY to its name:
   // a raw image (avatars/me.png / .jpg / .gif / .svg) OR an HTML page (avatars/me.html).
   "DISPLAY": "audio",

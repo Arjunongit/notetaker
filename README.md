@@ -1,6 +1,6 @@
 # Meeting Notetaker
 
-A silent bot that joins your video call, writes the transcript down **in real time**
+A silent bot that joins your meeting, writes the transcript down **in real time**
 (speech *and* chat), shows it live in your browser, and leaves when everyone else does.
 
 That's all it does — **on purpose.** It's a clean base you fork and make your own.
@@ -16,16 +16,16 @@ Python **or** Node, one config file. **Powered by [AgentCall](https://agentcall.
 - **Writes the transcript to a file in real time** — speech **and** chat (`.md` / `.txt` / `.json`).
 - **Shows it live** in your browser at `localhost:8080`.
 - **On-camera tile** (optional): the **Pattern AI Labs logo** or the **live transcript** — or just audio.
-- **Leaves** the moment the last human leaves — never bills an empty room.
+- **Leaves** the moment the last human leaves — never lingers in an empty room.
 - **Never speaks.** No AI, no summaries — fast and real-time.
 
 ---
 
 ## Setup
 
-**Two ways to set it up — pick whichever fits how you work:**
-- 🖥️ **In a terminal** — follow the four steps below.
-- 🤖 **In your AI editor** — prefer Claude Code, Cursor, or Gemini CLI? [Set it up with one prompt](#build-it-with-one-prompt) instead.
+**Two ways to set it up — pick whichever fits:**
+- 🖥️ **Do it yourself** — run the four steps below.
+- 🤖 **Let your AI assistant do it** — using Claude Code, Cursor, Gemini CLI, or similar? [Set it up with one prompt](#build-it-with-one-prompt) instead.
 
 **1. Get it** — "Use this template" / fork / clone this repo, then pick a language:
 
@@ -59,8 +59,8 @@ It asks a few quick questions — your free [AgentCall key](https://app.agentcal
 transcript · or your own logo/photo), and the **notes format** — and assembles your `config.jsonc`.
 **You built it.**
 
-> **After this one-time build, just edit [`config.jsonc`](config.jsonc) directly** to change any
-> setting — the build is only for first-time setup. Your key stays in `.env` (never committed).
+> **After this one-time build, just edit `config.jsonc` directly** to change any setting — the build
+> is only for first-time setup. Your key stays in `.env`, and both are gitignored (never committed).
 
 > **No terminal** — an AI agent (Claude Code, Cursor), CI, or a script? The builder detects it and won't
 > hang. Run it non-interactively with flags (a key is required):
@@ -81,7 +81,7 @@ Admit the bot (~30–90s), talk, drop a chat message — watch `notes/` fill in 
 
 ## Build it with one prompt
 
-🤖 **Prefer your AI editor to the terminal? Set up your notetaker with a single prompt.** Open this
+🤖 **Using an AI coding assistant? Set up your notetaker with a single prompt.** Open this
 repo in [Claude Code](https://claude.com/claude-code), Cursor, Gemini CLI, or Windsurf and paste the
 prompt below. Your agent runs the same one-time setup — your key, a name, the on-camera face, the
 notes format — and hands you a working notetaker. **It's a starting point you can edit freely.**
@@ -96,7 +96,7 @@ notes format — and hands you a working notetaker. **It's a starting point you 
 >    `AGENTCALL_API_KEY` exported or a `~/.agentcall/config.json`, use that and don't ask. A key is
 >    **required** — never proceed without one.
 > 3. Ask me three quick things: a **name** (default: AgentCall); its **on-camera face** — `audio`
->    (no tile, lightest on credits), `pattern` (Pattern AI Labs logo), `ring`, `transcript`, or
+>    (no video, just listens), `pattern` (Pattern AI Labs logo), `ring`, `transcript`, or
 >    `image` (my own logo/photo); and the **notes format** — `md`, `txt`, or `json`.
 > 4. Run the builder **once** with my answers — it writes a gitignored `.env` (the key) and
 >    `config.jsonc` (the settings):
@@ -110,7 +110,7 @@ notes format — and hands you a working notetaker. **It's a starting point you 
 > one-time setup I can change any setting by editing `config.jsonc` directly.
 
 Your agent copies, configures, and runs a tested notetaker — it never writes bot code, so there's
-nothing to debug later. Same result as the terminal build, zero terminal.
+nothing to debug later. Same result as doing it yourself — your assistant just runs the steps.
 
 ---
 
@@ -133,18 +133,15 @@ node   notetaker.js "<url>" --name Nova --display transcript     # or:  npm star
 
 ## The on-camera tile
 
-What the bot shows on camera is the **`DISPLAY`** setting in [`config.jsonc`](config.jsonc). **Change it
+What the bot shows on camera is the **`DISPLAY`** setting in `config.jsonc`. **Change it
 anytime — edit the file and re-run, no rebuild needed.** Built-in choices:
 
 | `DISPLAY` | The tile shows |
 |---|---|
-| `"audio"` | nothing — audio only · **lightest & cheapest, the default** |
+| `"audio"` | nothing — audio only · **lightest, the default** |
 | `"pattern"` | the Pattern AI Labs logo + bot name |
 | `"ring"` | a glowing neon ring + bot name |
 | `"transcript"` | the live transcript, on screen in the call |
-
-> `audio` runs in **audio mode** (~$0.47/hr all-in). The on-camera options use **video mode**
-> (~$0.57/hr) — a touch more per hour, so they're opt-in, not the default.
 
 ### Use your own logo or photo
 
@@ -154,6 +151,7 @@ Two steps, no code:
 2. Set `"DISPLAY": "acme"` in `config.jsonc` — the file name **without** the extension.
 
 That image becomes the bot's tile. (The builder can do this for you too — pick **image** and give it the path.)
+Want an animated or live-updating tile instead of a still image? Use an **HTML page** — see just below.
 
 ### Animated or live-data tile (advanced)
 
@@ -163,14 +161,14 @@ Drop an HTML page `avatars/<name>.html` and set `DISPLAY` to `<name>`. Start fro
 
 ---
 
-## Make it your own
+## Build on top
 
-This is a clean notetaker, on purpose. Add your own code in the two empty hooks at the top of the
-notetaker — `on_line` (every line, live) and `on_meeting_end` (the full transcript) — with whatever
-stack you like: summaries, email, Slack, a database, anything.
+This is a clean, minimal base, on purpose — fork it and make it yours: live summaries, email or
+Slack delivery, a database, a web UI, anything. There are two empty hooks at the top of the
+notetaker waiting for your own logic.
 
-Want to build something **beyond** a notetaker? It all runs on **[AgentCall](https://agentcall.dev)** —
-head there to go further.
+Building something bigger on it? It all runs on **[AgentCall](https://agentcall.dev)** — head there
+for the docs, examples, and full API. Whatever you want to build, you'll find what you need.
 
 ---
 
@@ -184,8 +182,8 @@ head there to go further.
 
 The notetaker runs AgentCall's **bridge** as the transport, reads its events, and writes your file —
 your transcript stays on **your** computer. For an avatar it runs the visual bridge, which tunnels a
-page you serve as the bot's video. You only pay for the minutes the bot is in the call — **~$0.47/hr
-in audio mode** (the default), a bit more on camera. The free tier covers your first 6 hours.
+page you serve as the bot's video. The bot only runs while it's actually in your meeting, and your
+notes never leave your machine.
 
 ---
 

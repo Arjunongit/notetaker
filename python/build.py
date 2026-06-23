@@ -177,7 +177,9 @@ def set_value(text, key, value):
 
 def write_config(name, display, fmt):
     p = os.path.join(_ROOT, "config.jsonc")
-    with open(p, encoding="utf-8") as f:
+    # On the first build there's no config.jsonc yet — seed it from the committed template.
+    src = p if os.path.isfile(p) else os.path.join(_ROOT, "config.default.jsonc")
+    with open(src, encoding="utf-8") as f:
         text = f.read()
     text = set_value(text, "BOT_NAME", name)
     text = set_value(text, "DISPLAY", display)
@@ -306,7 +308,7 @@ def main():
                     print("  " + col(DIM, "A key is required to run the notetaker — paste it, or Ctrl-C to cancel."))
         name = ask("Name your notetaker", "e.g. Juno · enter to keep AgentCall", "AgentCall")
         face = choose("How should it show up on camera?", [
-            ("audio", "no tile — lightest & cheapest"),
+            ("audio", "no video — just listens"),
             ("pattern", "the Pattern AI Labs logo"),
             ("ring", "a glowing neon ring"),
             ("transcript", "the live transcript, on screen"),

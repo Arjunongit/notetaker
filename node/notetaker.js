@@ -19,14 +19,17 @@ const path = require("path");
 const REPO_ROOT = path.dirname(__dirname); // config.jsonc, notes/, avatars/ and .env live here
 
 function loadConfig() {
-  // One config file, shared by python and node. JSON with // and /* */ comments —
-  // strip them, then parse. Edit config.jsonc at the repo root; nothing else.
+  // config.jsonc is created by the builder; before the first build, fall back to
+  // config.default.jsonc. JSON with // and /* */ comments — strip them, then parse.
+  const p = fs.existsSync(path.join(REPO_ROOT, "config.jsonc"))
+    ? path.join(REPO_ROOT, "config.jsonc")
+    : path.join(REPO_ROOT, "config.default.jsonc");
   try {
-    let text = fs.readFileSync(path.join(REPO_ROOT, "config.jsonc"), "utf-8");
+    let text = fs.readFileSync(p, "utf-8");
     text = text.replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, s) => (s ? s : ""));
     return JSON.parse(text);
   } catch (e) {
-    console.error(`Couldn't read config.jsonc (${e.message}). Check it for typos (trailing commas, missing quotes).`);
+    console.error(`Couldn't read config (${e.message}). Run the builder (node build.js), or check config.jsonc for typos (trailing commas, missing quotes).`);
     process.exit(1);
   }
 }
@@ -302,7 +305,9 @@ async function run(meetUrl, botName, display) {
         console.log(`\nSaved ${transcript.length} lines to: ${notes.finalize(transcript, meta)}`);
       } else {
         console.log("\nNo transcript captured - nothing to save.");
-        if (!joinedAt) {
+        if (endReason === "interrupted") {
+          console.log("(Stopped before the bot finished joining — nothing was captured.)");
+        } else if (!joinedAt) {
           console.log("The bridge exited before joining. Its output:");
           const hot = errTail.filter((l) => ["error", "cannot find", "no module", "not found", "traceback", "exception"].some((k) => l.toLowerCase().includes(k)));
           const show = (hot.length ? hot : errTail).slice(0, 6);
@@ -315,7 +320,7 @@ async function run(meetUrl, botName, display) {
 
     process.on("SIGINT", () => {
       if (done) { try { proc.kill("SIGKILL"); } catch {} process.exit(1); }  // 2nd Ctrl-C = hard quit
-      console.log("\nInterrupted - wrapping up...");
+      console.log("\nLeaving the meeting… (press Ctrl+C again to force-quit)");
       finish("interrupted");
     });
 
