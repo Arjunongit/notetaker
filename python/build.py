@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Build your notetaker — an interactive setup that assembles YOUR config.
+"""Build your notetaker — assembles YOUR config.
 
+In a terminal (cmd, VS Code, Cursor, Replit, bash...), just run it and answer:
     python build.py
 
-Walks you through naming it, choosing its on-camera face, the notes format, and
-your key, then writes config.jsonc + .env at the repo root. Powered by AgentCall.
+No terminal (an AI agent, CI, a script)? Pass the answers as flags instead:
+    python build.py --name Juno --display ring --format md --key ak_ac_...
+    python build.py --name Juno --image ./logo.png        # your own avatar
+
+Either way it writes config.jsonc + .env at the repo root. Powered by AgentCall.
 """
 
+import argparse
 import os
 import re
 import shutil
@@ -26,7 +31,7 @@ _IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
 def ask(label, default=""):
     hint = f" [{default}]" if default else ""
     try:
-        val = input(f"  {label}{hint}: ").strip().lstrip("\\ufeff")
+        val = input(f"  {label}{hint}: ").strip()
     except (EOFError, KeyboardInterrupt):
         print("\n  Build cancelled.")
         sys.exit(1)
@@ -52,22 +57,18 @@ def slug(name):
     return s or "brand"
 
 
-def install_image(name):
-    """Copy a user-supplied image into avatars/ and return its display name."""
-    path = ask("Path to your image (png/jpg/gif/svg/webp), or blank to skip")
-    if not path:
-        print("  (skipped — using the Pattern mark)")
-        return "pattern"
-    path = os.path.expanduser(path.strip().strip('"').strip("'"))
+def copy_image(path, name):
+    """Copy an image into avatars/ and return its display name (or 'pattern')."""
+    path = os.path.expanduser((path or "").strip().strip('"').strip("'"))
     ext = os.path.splitext(path)[1].lower()
-    if not os.path.isfile(path) or ext not in _IMG_EXTS:
-        print(f"  (couldn't read '{path}' — using the Pattern mark)")
+    if not path or not os.path.isfile(path) or ext not in _IMG_EXTS:
+        print(f"  (couldn't use image '{path}' — falling back to the Pattern mark)")
         return "pattern"
-    dest_name = slug(name)
+    dest = slug(name)
     try:
-        shutil.copyfile(path, os.path.join(_AVATARS, dest_name + ext))
-        print(f"  -> copied your image to avatars/{dest_name}{ext}")
-        return dest_name
+        shutil.copyfile(path, os.path.join(_AVATARS, dest + ext))
+        print(f"  -> copied your image to avatars/{dest}{ext}")
+        return dest
     except Exception as e:
         print(f"  (couldn't copy: {e} — using the Pattern mark)")
         return "pattern"
@@ -94,27 +95,53 @@ def write_env(key):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Build your notetaker. No flags in a terminal = interactive; "
+                    "pass flags for non-interactive / AI-agent / CI use.")
+    parser.add_argument("--name")
+    parser.add_argument("--display", help="audio | pattern | ring | transcript | <your avatar name>")
+    parser.add_argument("--format", choices=["md", "txt", "json"])
+    parser.add_argument("--image", help="path to a logo/photo to use as the avatar")
+    parser.add_argument("--key", help="your AgentCall API key")
+    args = parser.parse_args()
+
+    has_flags = any([args.name, args.display, args.format, args.image, args.key])
+
+    if not has_flags and not sys.stdin.isatty():
+        print("This builder asks you questions, but there's no terminal here")
+        print("(an AI agent, CI, or piped input). Two ways to build instead:\n")
+        print("  1) Pass the answers as flags:")
+        print("       python build.py --name Juno --display ring --format md --key ak_ac_...")
+        print("       (--display can be audio/pattern/ring/transcript, or --image ./logo.png)")
+        print("  2) Edit config.jsonc directly (BOT_NAME, DISPLAY, OUTPUT_FORMAT), key in .env.\n")
+        sys.exit(0)
+
     print("\n  Let's build your meeting notetaker.\n")
 
-    name = ask("Name it", "Scribe")
-
-    face = choose("Its face on camera:", [
-        ("pattern", "the Pattern sunburst mark"),
-        ("ring", "a glowing neon ring"),
-        ("transcript", "the live transcript on screen"),
-        ("audio", "no video, just listens (lightest)"),
-        ("image", "your own logo/photo"),
-    ], "pattern")
-    display = install_image(name) if face == "image" else face
-
-    fmt = choose("Save notes as:", [
-        ("md", "Markdown"),
-        ("txt", "plain text"),
-        ("json", "JSON"),
-    ], "md")
-
-    print()
-    key = ask("Your AgentCall key (free at app.agentcall.dev/api-keys; blank to add later)")
+    if has_flags:
+        name = args.name or "Scribe"
+        display = copy_image(args.image, name) if args.image else (args.display or "pattern")
+        fmt = args.format or "md"
+        key = args.key or ""
+    else:
+        name = ask("Name it", "Scribe")
+        face = choose("Its face on camera:", [
+            ("pattern", "the Pattern sunburst mark"),
+            ("ring", "a glowing neon ring"),
+            ("transcript", "the live transcript on screen"),
+            ("audio", "no video, just listens (lightest)"),
+            ("image", "your own logo/photo"),
+        ], "pattern")
+        if face == "image":
+            ipath = ask("Path to your image (png/jpg/gif/svg/webp), or blank to skip")
+            display = copy_image(ipath, name) if ipath else "pattern"
+        else:
+            display = face
+        fmt = choose("Save notes as:", [
+            ("md", "Markdown"), ("txt", "plain text"), ("json", "JSON"),
+        ], "md")
+        print()
+        key = ask("Your AgentCall key (free at app.agentcall.dev/api-keys; blank to add later)")
 
     print(f"\n  Building {name}...")
     print("  -> wiring the listener (AgentCall bridge)")

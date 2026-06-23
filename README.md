@@ -54,6 +54,10 @@ transcript · or your own logo/photo), choose the **notes format**, and paste yo
 [AgentCall key](https://app.agentcall.dev/api-keys). It assembles your `config.jsonc` + `.env`.
 **You built it.** *(Prefer to do it by hand? Edit [`config.jsonc`](config.jsonc) yourself.)*
 
+> **No terminal** — an AI agent (Claude Code, Cursor), CI, or a script? The builder detects it and
+> won't hang. Pass flags instead: `python build.py --name Juno --display ring --key ak_ac_...`
+> (or `--image ./logo.png`), or just edit [`config.jsonc`](config.jsonc) directly.
+
 **4. Run it** — join the meeting first, then:
 
 ```bash
