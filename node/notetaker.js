@@ -19,17 +19,14 @@ const path = require("path");
 const REPO_ROOT = path.dirname(__dirname); // config.jsonc, notes/, avatars/ and .env live here
 
 function loadConfig() {
-  // config.jsonc is created by the builder; before the first build, fall back to
-  // config.default.jsonc. JSON with // and /* */ comments — strip them, then parse.
-  const p = fs.existsSync(path.join(REPO_ROOT, "config.jsonc"))
-    ? path.join(REPO_ROOT, "config.jsonc")
-    : path.join(REPO_ROOT, "config.default.jsonc");
+  // One config file, shared by python and node. JSON with // and /* */ comments —
+  // strip them, then parse. Edit config.jsonc at the repo root; nothing else.
   try {
-    let text = fs.readFileSync(p, "utf-8");
+    let text = fs.readFileSync(path.join(REPO_ROOT, "config.jsonc"), "utf-8");
     text = text.replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, s) => (s ? s : ""));
     return JSON.parse(text);
   } catch (e) {
-    console.error(`Couldn't read config (${e.message}). Run the builder (node build.js), or check config.jsonc for typos (trailing commas, missing quotes).`);
+    console.error(`Couldn't read config.jsonc (${e.message}). Check it for typos (trailing commas, missing quotes).`);
     process.exit(1);
   }
 }

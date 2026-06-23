@@ -7,9 +7,6 @@ notes/
 # Secrets
 .env
 
-# Your built config — the builder creates it from config.default.jsonc on first build
-config.jsonc
-
 # Python
 __pycache__/
 *.pyc

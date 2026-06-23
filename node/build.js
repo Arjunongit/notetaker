@@ -128,9 +128,7 @@ function setValue(text, key, value) {
 
 function writeConfig(name, display, fmt) {
   const p = path.join(ROOT, "config.jsonc");
-  // On the first build there's no config.jsonc yet — seed it from the committed template.
-  const src = fs.existsSync(p) ? p : path.join(ROOT, "config.default.jsonc");
-  let text = fs.readFileSync(src, "utf-8");
+  let text = fs.readFileSync(p, "utf-8");
   text = setValue(text, "BOT_NAME", name);
   text = setValue(text, "DISPLAY", display);
   text = setValue(text, "OUTPUT_FORMAT", fmt);

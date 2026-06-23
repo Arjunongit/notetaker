@@ -177,9 +177,7 @@ def set_value(text, key, value):
 
 def write_config(name, display, fmt):
     p = os.path.join(_ROOT, "config.jsonc")
-    # On the first build there's no config.jsonc yet — seed it from the committed template.
-    src = p if os.path.isfile(p) else os.path.join(_ROOT, "config.default.jsonc")
-    with open(src, encoding="utf-8") as f:
+    with open(p, encoding="utf-8") as f:
         text = f.read()
     text = set_value(text, "BOT_NAME", name)
     text = set_value(text, "DISPLAY", display)

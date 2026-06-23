@@ -1,7 +1,7 @@
 {
   // ══════════════════════════════════════════════════════════════════════════
-  //  Notetaker config (JSON + comments, shared by python & node).
-  //  Edit config.jsonc — the builder creates it from this default on first build.
+  //  YOUR NOTETAKER — the one file you edit (settings shared by python & node).
+  //  Run the builder once to fill it in, or just edit it directly. JSON + comments.
   // ══════════════════════════════════════════════════════════════════════════
 
   // Your notetaker's name (shown in the meeting). Set it via the builder —

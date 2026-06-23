@@ -59,8 +59,8 @@ It asks a few quick questions — your free [AgentCall key](https://app.agentcal
 transcript · or your own logo/photo), and the **notes format** — and assembles your `config.jsonc`.
 **You built it.**
 
-> **After this one-time build, just edit `config.jsonc` directly** to change any setting — the build
-> is only for first-time setup. Your key stays in `.env`, and both are gitignored (never committed).
+> **After this one-time build, just edit [`config.jsonc`](config.jsonc) directly** to change any
+> setting — the build is only for first-time setup. Your key stays in `.env` (gitignored, never committed).
 
 > **No terminal** — an AI agent (Claude Code, Cursor), CI, or a script? The builder detects it and won't
 > hang. Run it non-interactively with flags (a key is required):
@@ -133,7 +133,7 @@ node   notetaker.js "<url>" --name Nova --display transcript     # or:  npm star
 
 ## The on-camera tile
 
-What the bot shows on camera is the **`DISPLAY`** setting in `config.jsonc`. **Change it
+What the bot shows on camera is the **`DISPLAY`** setting in [`config.jsonc`](config.jsonc). **Change it
 anytime — edit the file and re-run, no rebuild needed.** Built-in choices:
 
 | `DISPLAY` | The tile shows |
