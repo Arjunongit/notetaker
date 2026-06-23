@@ -1,0 +1,36 @@
+{
+  "name": "notetaker-starter-node",
+  "version": "1.0.0",
+  "description": "A silent meeting notetaker you can fork and make your own. Powered by AgentCall.",
+  "license": "MIT",
+  "author": "Pattern AI Labs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Arjunongit/notetaker.git",
+    "directory": "node"
+  },
+  "homepage": "https://github.com/Arjunongit/notetaker#readme",
+  "bugs": {
+    "url": "https://github.com/Arjunongit/notetaker/issues"
+  },
+  "keywords": [
+    "notetaker",
+    "meeting",
+    "transcript",
+    "agentcall",
+    "google-meet",
+    "zoom",
+    "teams",
+    "bot"
+  ],
+  "type": "commonjs",
+  "scripts": {
+    "start": "node notetaker.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

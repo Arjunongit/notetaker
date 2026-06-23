@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{BOT_NAME}} — transcript</title>
+<!--
+  The bot's video tile, "transcript" mode — the live transcript, on screen in the
+  call. Polls the notetaker's own /transcript.json (tunnelled in by the bridge).
+  No meeting state, no audio. {{BOT_NAME}} and {{AVATAR_LINES}} are filled in by
+  the notetaker as the page is served.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg: #0a0e1a; --text: #e6eaf2; --dim: #8b95ad; --accent: #5bd1a3; --chat: #c792ea; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    height: 100%; display: flex; flex-direction: column; overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+  header { display: flex; align-items: center; gap: 11px; padding: 18px 28px; border-bottom: 1px solid #1b2336; }
+  .name { font-size: 24px; font-weight: 600; letter-spacing: -.01em; }
+  .live { margin-left: auto; font-size: 15px; color: var(--dim); display: flex; align-items: center; gap: 7px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff5b5b; animation: blink 1.7s ease-in-out infinite; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+  #lines { flex: 1; overflow: hidden; padding: 20px 28px; display: flex; flex-direction: column; justify-content: flex-end; gap: 13px; }
+  .line { font-size: 21px; line-height: 1.4; }
+  .line.new { animation: rise .35s ease; }     /* only genuinely new lines animate */
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .who { font-weight: 600; color: var(--accent); }
+  .line.chat .who { color: var(--chat); }
+  .line.chat .what::after { content: " (chat)"; color: var(--dim); font-size: .8em; }
+  .empty { margin: auto; color: var(--dim); font-size: 20px; }
+</style>
+</head>
+<body>
+  <header>
+    <span class="name">{{BOT_NAME}}</span>
+    <span class="live"><span class="dot"></span> Live</span>
+  </header>
+  <div id="lines"><div class="empty">Listening...</div></div>
+<script>
+  const N = {{AVATAR_LINES}};
+  const box = document.getElementById('lines');
+  const esc = (s) => (s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const key = (l) => l.time + '|' + l.speaker + '|' + l.kind + '|' + l.text;
+  let shown = [];   // keys currently rendered, in order
+  async function tick() {
+    let d;
+    try {
+      const r = await fetch('transcript.json', { cache: 'no-store' });
+      if (!r.ok) return;
+      d = await r.json();
+    } catch (e) { return; }
+    const lines = (d.lines || []).slice(-N);
+    const keys = lines.map(key);
+    // Unchanged since last poll → leave the DOM alone. This is what stops the flicker.
+    if (keys.length === shown.length && keys.every((k, i) => k === shown[i])) return;
+    if (!lines.length) { box.innerHTML = '<div class="empty">Listening...</div>'; shown = []; return; }
+    const prev = new Set(shown);
+    box.innerHTML = lines.map(l =>
+      `<div class="line ${l.kind === 'chat' ? 'chat' : ''}${prev.has(key(l)) ? '' : ' new'}">` +
+      `<span class="who">${esc(l.speaker)}:</span> <span class="what">${esc(l.text)}</span></div>`
+    ).join('');
+    shown = keys;
+  }
+  setInterval(tick, 700);
+  tick();
+</script>
+</body>
+</html>
