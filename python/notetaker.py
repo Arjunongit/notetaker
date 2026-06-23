@@ -117,16 +117,16 @@ def end_call(call_id):
         f"{API_BASE}/v1/calls/{call_id}", method="DELETE",
         headers={"Authorization": f"Bearer {API_KEY}"},
     )
-    for attempt in range(3):   # retry: a swallowed failure here keeps billing
+    for attempt in range(2):   # one quick retry; keep it short so shutdown stays fast
         try:
-            urlrequest.urlopen(req, timeout=10).read()
+            urlrequest.urlopen(req, timeout=5).read()
             return
         except Exception as e:
             if getattr(e, "code", None) == 404:   # already gone — billing is stopped
                 return
-            if attempt < 2:
+            if attempt == 0:
                 time.sleep(0.5)
-    print(f"  (warning: couldn't confirm the call was stopped — id {call_id})")
+    print("  (note: couldn't confirm the call stopped; the bot has left and the call expires on its own.)")
 
 
 def hhmmss(ts):
@@ -434,31 +434,37 @@ def run(meet_url, bot_name, display):
         # Capture the call id (the bridge is still alive — it's in its own process
         # group) and DELETE the call. Wrapped so even an impatient second Ctrl-C
         # during teardown can't skip the DELETE and leave an orphan bot.
-        call_id = None
-        while True:
+        call_id = box["call_id"]
+        if call_id is None and proc.poll() is None:
+            # Interrupted before the bridge reported the id — wait briefly for it
+            # (Ctrl-C skips the wait; you're never stuck here).
             try:
-                if box["call_id"] is None and proc.poll() is None:
-                    print("Stopping the call...")
-                    deadline = time.time() + 8
-                    while box["call_id"] is None and proc.poll() is None and time.time() < deadline:
-                        time.sleep(0.1)
-                call_id = box["call_id"]
-                end_call(call_id)
-                break
+                deadline = time.time() + 3
+                while box["call_id"] is None and proc.poll() is None and time.time() < deadline:
+                    time.sleep(0.1)
             except KeyboardInterrupt:
-                continue
+                pass
+            call_id = box["call_id"]
+        # End the bridge (it runs in its own process group, so end it explicitly).
+        # This always runs, even on a Ctrl-C during the wait.
         try:
             proc.stdin.close()
         except Exception:
             pass
         try:
-            proc.wait(timeout=10)
-        except Exception:
-            proc.kill()
+            proc.wait(timeout=8)
+        except (Exception, KeyboardInterrupt):
             try:
-                proc.wait(timeout=5)
+                proc.kill()
+                proc.wait(timeout=4)
             except Exception:
                 pass
+        # Stop billing (best-effort, quick). A Ctrl-C here just exits — the bridge's
+        # alone-timeout reclaims the call — so shutdown never hangs or loops.
+        try:
+            end_call(call_id)
+        except KeyboardInterrupt:
+            pass
         set_status("ended")
         duration = "unknown"
         if joined_at:

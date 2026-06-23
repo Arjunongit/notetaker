@@ -78,14 +78,16 @@ function bridgeCommand(display) {
 
 async function endCall(callId) {
   if (!callId || !API_KEY) return;
-  for (let attempt = 0; attempt < 3; attempt++) {   // retry: a swallowed failure keeps billing
+  for (let attempt = 0; attempt < 2; attempt++) {   // one quick retry; keep shutdown fast
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 5000);   // fetch has no default timeout — cap it
     try {
-      const res = await fetch(`${API_BASE}/v1/calls/${callId}`, { method: "DELETE", headers: { Authorization: `Bearer ${API_KEY}` } });
+      const res = await fetch(`${API_BASE}/v1/calls/${callId}`, { method: "DELETE", headers: { Authorization: `Bearer ${API_KEY}` }, signal: ac.signal });
       if (res.ok || res.status === 404) return;
-    } catch { /* retry */ }
-    await new Promise((r) => setTimeout(r, 500));
+    } catch { /* retry */ } finally { clearTimeout(t); }
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 500));
   }
-  console.log(`  (warning: couldn't confirm the call was stopped — id ${callId})`);
+  console.log("  (note: couldn't confirm the call stopped; the bot has left and the call expires on its own.)");
 }
 
 function localISO() {
@@ -257,7 +259,7 @@ async function run(meetUrl, botName, display) {
     // Don't tear down until we know the call id (the bridge reports it ~1s in),
     // so the DELETE always lands — otherwise an aborted call leaves a bot joining.
     const waitForCallId = async () => {
-      const deadline = Date.now() + 8000;
+      const deadline = Date.now() + 3000;
       while (callId === null && proc.exitCode === null && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 100));
       }
@@ -306,7 +308,11 @@ async function run(meetUrl, botName, display) {
       resolve();
     };
 
-    process.on("SIGINT", () => { console.log("\nInterrupted - wrapping up..."); finish("interrupted"); });
+    process.on("SIGINT", () => {
+      if (done) { try { proc.kill("SIGKILL"); } catch {} process.exit(1); }  // 2nd Ctrl-C = hard quit
+      console.log("\nInterrupted - wrapping up...");
+      finish("interrupted");
+    });
 
     console.log(`Sending '${botName}' in via the bridge... (~30-90s to appear)`);
     if (display !== "audio") console.log(`  showing the '${display}' avatar on the bot's video tile`);
