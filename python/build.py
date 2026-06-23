@@ -28,10 +28,47 @@ _AVATARS = os.path.join(_ROOT, "avatars")
 _IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
 
 
+# ── terminal styling (raw ANSI; degrades to plain text when unsupported) ────────
+def _enable_ansi():
+    if not sys.stdout.isatty():
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            k = ctypes.windll.kernel32
+            k.SetConsoleMode(k.GetStdHandle(-11), 7)  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        except Exception:
+            return False
+    return True
+
+
+_ANSI = _enable_ansi()
+CYAN, GREEN, DIM, BOLD = "36", "32", "2", "1"
+
+
+def col(code, s):
+    return f"\033[{code}m{s}\033[0m" if _ANSI else s
+
+
+def _row(colored, plain, w):
+    pad = " " * max(0, w - 1 - len(plain))
+    return col(CYAN, "  │") + " " + colored + pad + col(CYAN, "│")
+
+
+def banner():
+    w = 48
+    print()
+    print(col(CYAN, "  ╭" + "─" * w + "╮"))
+    print(_row(col(BOLD, "◆  N O T E T A K E R"), "◆  N O T E T A K E R", w))
+    print(_row(col(DIM, "build your own  ·  powered by AgentCall"),
+               "build your own  ·  powered by AgentCall", w))
+    print(col(CYAN, "  ╰" + "─" * w + "╯"))
+
+
 def ask(label, default=""):
-    hint = f" [{default}]" if default else ""
+    hint = col(DIM, f" [{default}]") if default else ""
     try:
-        val = input(f"  {label}{hint}: ").strip()
+        val = input(f"  {label}{hint} " + col(CYAN, "› ")).strip()
     except (EOFError, KeyboardInterrupt):
         print("\n  Build cancelled.")
         sys.exit(1)
@@ -39,11 +76,11 @@ def ask(label, default=""):
 
 
 def choose(label, options, default):
-    print(f"\n  {label}")
+    print(f"\n  {col(BOLD, label)}")
     for i, (key, desc) in enumerate(options, 1):
-        star = "  (default)" if key == default else ""
-        print(f"    {i}) {key:11s}{desc}{star}")
-    raw = ask("Choose", default)
+        star = col(CYAN, "  ‹ default") if key == default else ""
+        print(f"    {col(CYAN, str(i))}) {key:11s}{col(DIM, desc)}{star}")
+    raw = ask("choose", default)
     if raw.isdigit() and 1 <= int(raw) <= len(options):
         return options[int(raw) - 1][0]
     for key, _ in options:
@@ -58,7 +95,6 @@ def slug(name):
 
 
 def copy_image(path, name):
-    """Copy an image into avatars/ and return its display name (or 'pattern')."""
     path = os.path.expanduser((path or "").strip().strip('"').strip("'"))
     ext = os.path.splitext(path)[1].lower()
     if not path or not os.path.isfile(path) or ext not in _IMG_EXTS:
@@ -67,7 +103,7 @@ def copy_image(path, name):
     dest = slug(name)
     try:
         shutil.copyfile(path, os.path.join(_AVATARS, dest + ext))
-        print(f"  -> copied your image to avatars/{dest}{ext}")
+        print(col(GREEN, "     ✓ ") + f"copied your image to avatars/{dest}{ext}")
         return dest
     except Exception as e:
         print(f"  (couldn't copy: {e} — using the Pattern mark)")
@@ -94,6 +130,21 @@ def write_env(key):
         f.write(f"AGENTCALL_API_KEY={key}\n")
 
 
+def assemble(name, display, fmt, key):
+    print(col(CYAN, "\n  ⚙  ") + col(BOLD, f"Building {name}") + col(DIM, " ..."))
+    print(col(GREEN, "     ✓ ") + "wired the listener (AgentCall bridge)")
+    print(col(GREEN, "     ✓ ") + f"set the '{display}' face")
+    write_config(name, display, fmt)
+    print(col(GREEN, "     ✓ ") + "wrote config.jsonc")
+    if key:
+        write_env(key)
+        print(col(GREEN, "     ✓ ") + "saved your key to .env")
+    print(col(f"{GREEN};{BOLD}", f"\n  ✦  Done — you built {name}."))
+    if not key:
+        print(col(DIM, "     add your key: copy .env.example to .env and paste it in"))
+    print(col(DIM, "     launch:") + ' python notetaker.py "https://meet.google.com/your-link"\n')
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build your notetaker. No flags in a terminal = interactive; "
@@ -116,7 +167,7 @@ def main():
         print("  2) Edit config.jsonc directly (BOT_NAME, DISPLAY, OUTPUT_FORMAT), key in .env.\n")
         sys.exit(0)
 
-    print("\n  Let's build your meeting notetaker.\n")
+    banner()
 
     if has_flags:
         name = args.name or "Scribe"
@@ -124,8 +175,9 @@ def main():
         fmt = args.format or "md"
         key = args.key or ""
     else:
-        name = ask("Name it", "Scribe")
-        face = choose("Its face on camera:", [
+        print(col(DIM, "\n  Four quick choices and it's yours.\n"))
+        name = ask("1 · name it", "Scribe")
+        face = choose("2 · its face on camera", [
             ("pattern", "the Pattern sunburst mark"),
             ("ring", "a glowing neon ring"),
             ("transcript", "the live transcript on screen"),
@@ -133,30 +185,17 @@ def main():
             ("image", "your own logo/photo"),
         ], "pattern")
         if face == "image":
-            ipath = ask("Path to your image (png/jpg/gif/svg/webp), or blank to skip")
+            ipath = ask("    path to your image (png/jpg/gif/svg/webp), blank to skip")
             display = copy_image(ipath, name) if ipath else "pattern"
         else:
             display = face
-        fmt = choose("Save notes as:", [
+        fmt = choose("3 · save notes as", [
             ("md", "Markdown"), ("txt", "plain text"), ("json", "JSON"),
         ], "md")
         print()
-        key = ask("Your AgentCall key (free at app.agentcall.dev/api-keys; blank to add later)")
+        key = ask("4 · your AgentCall key (free at app.agentcall.dev/api-keys; blank to add later)")
 
-    print(f"\n  Building {name}...")
-    print("  -> wiring the listener (AgentCall bridge)")
-    print(f"  -> giving {name} the '{display}' face")
-    write_config(name, display, fmt)
-    print("  -> wrote config.jsonc")
-    if key:
-        write_env(key)
-        print("  -> saved your key to .env")
-
-    print(f"\n  Done — you built {name}.")
-    if not key:
-        print("  Add your key: copy .env.example to .env and paste it in.")
-    print("  Launch it:")
-    print('     python notetaker.py "https://meet.google.com/your-link"\n')
+    assemble(name, display, fmt, key)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,26 @@ const ROOT = path.dirname(__dirname);
 const AVATARS = path.join(ROOT, "avatars");
 const IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
 
+// ── terminal styling (ANSI on a TTY; plain text otherwise) ─────────────────────
+const ANSI = !!process.stdout.isTTY;
+const CYAN = "36", GREEN = "32", DIM = "2", BOLD = "1";
+const col = (code, s) => (ANSI ? `\x1b[${code}m${s}\x1b[0m` : s);
+
+function row(colored, plain, w) {
+  const pad = " ".repeat(Math.max(0, w - 1 - plain.length));
+  return col(CYAN, "  │") + " " + colored + pad + col(CYAN, "│");
+}
+
+function banner() {
+  const w = 48;
+  console.log();
+  console.log(col(CYAN, "  ╭" + "─".repeat(w) + "╮"));
+  console.log(row(col(BOLD, "◆  N O T E T A K E R"), "◆  N O T E T A K E R", w));
+  console.log(row(col(DIM, "build your own  ·  powered by AgentCall"),
+                  "build your own  ·  powered by AgentCall", w));
+  console.log(col(CYAN, "  ╰" + "─".repeat(w) + "╯"));
+}
+
 function parseFlags(argv) {
   const a = {};
   const rest = argv.slice(2);
@@ -48,7 +68,7 @@ function copyImage(imgPath, name) {
   const dest = slug(name) + ext;
   try {
     fs.copyFileSync(p, path.join(AVATARS, dest));
-    console.log(`  -> copied your image to avatars/${dest}`);
+    console.log(col(GREEN, "     ✓ ") + `copied your image to avatars/${dest}`);
     return slug(name);
   } catch (e) {
     console.log(`  (couldn't copy: ${e.message} — using the Pattern mark)`);
@@ -74,39 +94,39 @@ function writeEnv(key) {
 }
 
 function assemble(name, display, fmt, key) {
-  console.log(`\n  Building ${name}...`);
-  console.log("  -> wiring the listener (AgentCall bridge)");
-  console.log(`  -> giving ${name} the '${display}' face`);
+  console.log(col(CYAN, "\n  ⚙  ") + col(BOLD, `Building ${name}`) + col(DIM, " ..."));
+  console.log(col(GREEN, "     ✓ ") + "wired the listener (AgentCall bridge)");
+  console.log(col(GREEN, "     ✓ ") + `set the '${display}' face`);
   writeConfig(name, display, fmt);
-  console.log("  -> wrote config.jsonc");
-  if (key) { writeEnv(key); console.log("  -> saved your key to .env"); }
-  console.log(`\n  Done — you built ${name}.`);
-  if (!key) console.log("  Add your key: copy .env.example to .env and paste it in.");
-  console.log("  Launch it:");
-  console.log('     node notetaker.js "https://meet.google.com/your-link"\n');
+  console.log(col(GREEN, "     ✓ ") + "wrote config.jsonc");
+  if (key) { writeEnv(key); console.log(col(GREEN, "     ✓ ") + "saved your key to .env"); }
+  console.log(col(`${GREEN};${BOLD}`, `\n  ✦  Done — you built ${name}.`));
+  if (!key) console.log(col(DIM, "     add your key: copy .env.example to .env and paste it in"));
+  console.log(col(DIM, "     launch:") + ' node notetaker.js "https://meet.google.com/your-link"\n');
 }
 
 async function interactive() {
   const readline = require("readline/promises");
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = async (label, def = "") => {
-    const v = (await rl.question(`  ${label}${def ? ` [${def}]` : ""}: `)).trim();
+    const hint = def ? col(DIM, ` [${def}]`) : "";
+    const v = (await rl.question(`  ${label}${hint} ` + col(CYAN, "› "))).trim();
     return v || def;
   };
   const choose = async (label, options, def) => {
-    console.log(`\n  ${label}`);
+    console.log(`\n  ${col(BOLD, label)}`);
     options.forEach(([key, desc], i) =>
-      console.log(`    ${i + 1}) ${key.padEnd(11)}${desc}${key === def ? "  (default)" : ""}`));
-    const raw = await ask("Choose", def);
+      console.log(`    ${col(CYAN, String(i + 1))}) ${key.padEnd(11)}${col(DIM, desc)}${key === def ? col(CYAN, "  ‹ default") : ""}`));
+    const raw = await ask("choose", def);
     const n = parseInt(raw, 10);
     if (Number.isInteger(n) && n >= 1 && n <= options.length) return options[n - 1][0];
     const m = options.find(([k]) => k.toLowerCase() === raw.toLowerCase());
     return m ? m[0] : def;
   };
 
-  console.log("\n  Let's build your meeting notetaker.\n");
-  const name = await ask("Name it", "Scribe");
-  const face = await choose("Its face on camera:", [
+  console.log(col(DIM, "\n  Four quick choices and it's yours.\n"));
+  const name = await ask("1 · name it", "Scribe");
+  const face = await choose("2 · its face on camera", [
     ["pattern", "the Pattern sunburst mark"],
     ["ring", "a glowing neon ring"],
     ["transcript", "the live transcript on screen"],
@@ -115,14 +135,14 @@ async function interactive() {
   ], "pattern");
   let display = face;
   if (face === "image") {
-    const ip = await ask("Path to your image (png/jpg/gif/svg/webp), or blank to skip");
+    const ip = await ask("    path to your image (png/jpg/gif/svg/webp), blank to skip");
     display = ip ? copyImage(ip, name) : "pattern";
   }
-  const fmt = await choose("Save notes as:", [
+  const fmt = await choose("3 · save notes as", [
     ["md", "Markdown"], ["txt", "plain text"], ["json", "JSON"],
   ], "md");
   console.log();
-  const key = await ask("Your AgentCall key (free at app.agentcall.dev/api-keys; blank to add later)");
+  const key = await ask("4 · your AgentCall key (free at app.agentcall.dev/api-keys; blank to add later)");
   rl.close();
   assemble(name, display, fmt, key);
 }
@@ -141,8 +161,9 @@ async function main() {
     process.exit(0);
   }
 
+  banner();
+
   if (hasFlags) {
-    console.log("\n  Let's build your meeting notetaker.\n");
     const name = args.name || "Scribe";
     const display = args.image ? copyImage(args.image, name) : (args.display || "pattern");
     assemble(name, display, args.format || "md", args.key || "");
