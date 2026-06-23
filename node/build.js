@@ -97,11 +97,15 @@ function slug(name) {
 }
 
 function copyImage(imgPath, name) {
-  let p = (imgPath || "").replace(/^["']|["']$/g, "");
+  // Strip invisible bidi/zero-width marks that Windows' "Copy as path" prepends,
+  // plus surrounding quotes/space, so a pasted path actually resolves.
+  let p = (imgPath || "").replace(/[\u200b-\u200f\u202a-\u202e\ufeff]/g, "").trim().replace(/^["']|["']$/g, "").trim();
   if (p.startsWith("~")) p = path.join(os.homedir(), p.slice(1));
   const ext = path.extname(p).toLowerCase();
-  if (!p || !fs.existsSync(p) || !IMG_EXTS.includes(ext)) {
-    console.log(`   (couldn't use image '${p}' — falling back to the Pattern mark)`);
+  if (!p) { console.log("   (no image given — using the Pattern mark)"); return "pattern"; }
+  if (!fs.existsSync(p)) { console.log("   (couldn't find that file — using the Pattern mark)\n     " + p); return "pattern"; }
+  if (!IMG_EXTS.includes(ext)) {
+    console.log(`   (that's a '${ext || "?"}' file — use an image: png, jpg, jpeg, gif, webp, or svg. Using the Pattern mark.)`);
     return "pattern";
   }
   const dest = slug(name) + ext;
@@ -153,29 +157,43 @@ function existingKey() {
 }
 
 function writeEnv(key) {
-  // Write the gitignored .env with the AgentCall key. Only called once we have one.
+  // Write/refresh the gitignored .env: set AGENTCALL_API_KEY, keep any other lines.
   const p = path.join(ROOT, ".env");
-  fs.writeFileSync(p, `AGENTCALL_API_KEY=${key}\n`);
+  let keep = [];
+  try {
+    keep = fs.readFileSync(p, "utf-8").split("\n").map((l) => l.replace(/\r$/, ""))
+      .filter((l) => l.trim() && !l.trim().startsWith("AGENTCALL_API_KEY="));
+  } catch { keep = []; }
+  fs.writeFileSync(p, [`AGENTCALL_API_KEY=${key}`, ...keep].join("\n") + "\n");
   if (process.platform !== "win32") {           // keep the secret owner-only on POSIX
     try { fs.chmodSync(p, 0o600); } catch { /* best effort */ }
   }
 }
 
-function assemble(name, display, fmt, key) {
+function nextSteps() {
+  const b = (s) => col(BOLD, s), d = (s) => col(DIM, s);
+  console.log("  " + b("Run it"));
+  console.log("    node notetaker.js " + d('"https://meet.google.com/your-link"'));
+  console.log();
+  console.log("  " + b("Change anything later"));
+  console.log("    " + d("·") + " name, face, or notes format  " + d("→") + "  edit " + b("config.jsonc"));
+  console.log("    " + d("·") + " your AgentCall key  " + d("→") + "  edit " + b(".env"));
+  console.log("    " + d("·") + " your own camera tile  " + d("→") + "  drop an image in " + b("avatars/") + " and set " + b("DISPLAY"));
+  console.log();
+}
+
+function assemble(name, display, fmt, key, reused) {
   console.log();
   console.log("  " + col(BOLD, `Building ${name}`) + col(DIM, " …"));
   console.log("   " + col(BOLD, "✓") + " wired the AgentCall listener");
   console.log("   " + col(BOLD, "✓") + ` set the "${display}" face`);
   writeConfig(name, display, fmt);
   console.log("   " + col(BOLD, "✓") + " wrote config.jsonc");
-  if (key) { writeEnv(key); console.log("   " + col(BOLD, "✓") + " saved your key to .env"); }
-  else console.log("   " + col(BOLD, "✓") + " using the AgentCall key already set");
+  writeEnv(key);
+  console.log("   " + col(BOLD, "✓") + (reused ? " copied your AgentCall key into .env" : " saved your key to .env"));
 
   doneCard(name);
-  console.log("  " + col(BOLD, "Run it:") + '  node notetaker.js "https://meet.google.com/your-link"');
-  console.log("  " + col(DIM, "Edit config.jsonc anytime to change the name, face, or format · your key stays in .env."));
-  console.log("  " + col(DIM, "Custom on-camera image? Drop it in avatars/ and set DISPLAY to its name."));
-  console.log();
+  nextSteps();
 }
 
 async function interactive() {
@@ -226,7 +244,8 @@ async function interactive() {
     ["md", "Markdown"], ["txt", "plain text"], ["json", "JSON"],
   ], "md");
   rl.close();
-  assemble(name, display, fmt, key);
+  const found = existingKey();
+  assemble(name, display, fmt, key || found, !key && !!found);
 }
 
 async function main() {
@@ -248,13 +267,14 @@ async function main() {
     const name = args.name || "AgentCall";
     const display = args.image ? copyImage(args.image, name) : (args.display || "audio");
     const key = args.key || "";
-    if (!key && !existingKey()) {
+    const found = existingKey();
+    if (!key && !found) {
       console.log("\n  An AgentCall key is required — the notetaker can't run without one.");
       console.log("  Pass --key ak_ac_...  (free at app.agentcall.dev/api-keys),");
       console.log("  or set AGENTCALL_API_KEY, or add it to .env, then build again.");
       process.exit(1);
     }
-    assemble(name, display, args.format || "md", key);
+    assemble(name, display, args.format || "md", key || found, !key && !!found);
   } else {
     await interactive();
   }

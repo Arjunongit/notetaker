@@ -144,10 +144,19 @@ def slug(name):
 
 
 def copy_image(path, name):
-    path = os.path.expanduser((path or "").strip().strip('"').strip("'"))
+    # Strip invisible bidi/zero-width marks that Windows' "Copy as path" prepends,
+    # plus surrounding quotes/space, so a pasted path actually resolves.
+    path = re.sub(r"[\u200b-\u200f\u202a-\u202e\ufeff]", "", path or "").strip().strip('"').strip("'").strip()
+    path = os.path.expanduser(path)
     ext = os.path.splitext(path)[1].lower()
-    if not path or not os.path.isfile(path) or ext not in _IMG_EXTS:
-        print(f"   (couldn't use image '{path}' — falling back to the Pattern mark)")
+    if not path:
+        print("   (no image given — using the Pattern mark)")
+        return "pattern"
+    if not os.path.isfile(path):
+        print("   (couldn't find that file — using the Pattern mark)\n     " + path)
+        return "pattern"
+    if ext not in _IMG_EXTS:
+        print(f"   (that's a '{ext or '?'}' file — use an image: png, jpg, jpeg, gif, webp, or svg. Using the Pattern mark.)")
         return "pattern"
     dest = slug(name)
     try:
@@ -209,10 +218,20 @@ def _existing_key():
 
 
 def write_env(key):
-    """Write the gitignored .env with the AgentCall key. Only called once we have one."""
+    """Write/refresh the gitignored .env: set AGENTCALL_API_KEY, keep any other lines."""
     p = os.path.join(_ROOT, ".env")
+    keep = []
+    if os.path.isfile(p):
+        try:
+            with open(p, encoding="utf-8") as f:
+                keep = [ln.rstrip("\n") for ln in f
+                        if ln.strip() and not ln.strip().startswith("AGENTCALL_API_KEY=")]
+        except OSError:
+            keep = []
     with open(p, "w", encoding="utf-8") as f:
         f.write(f"AGENTCALL_API_KEY={key}\n")
+        for ln in keep:
+            f.write(ln + "\n")
     if os.name != "nt":  # keep the secret owner-only on POSIX (no-op on Windows)
         try:
             os.chmod(p, 0o600)
@@ -220,24 +239,29 @@ def write_env(key):
             pass
 
 
-def assemble(name, display, fmt, key):
+def _next_steps():
+    print("  " + col(BOLD, "Run it"))
+    print("    python notetaker.py " + col(DIM, '"https://meet.google.com/your-link"'))
+    print()
+    print("  " + col(BOLD, "Change anything later"))
+    print("    " + col(DIM, "·") + " name, face, or notes format  " + col(DIM, "→") + "  edit " + col(BOLD, "config.jsonc"))
+    print("    " + col(DIM, "·") + " your AgentCall key  " + col(DIM, "→") + "  edit " + col(BOLD, ".env"))
+    print("    " + col(DIM, "·") + " your own camera tile  " + col(DIM, "→") + "  drop an image in " + col(BOLD, "avatars/") + " and set " + col(BOLD, "DISPLAY"))
+    print()
+
+
+def assemble(name, display, fmt, key, reused=False):
     print()
     print("  " + col(BOLD, f"Building {name}") + col(DIM, " …"))
     print("   " + col(BOLD, "✓") + " wired the AgentCall listener")
     print("   " + col(BOLD, "✓") + f' set the "{display}" face')
     write_config(name, display, fmt)
     print("   " + col(BOLD, "✓") + " wrote config.jsonc")
-    if key:
-        write_env(key)
-        print("   " + col(BOLD, "✓") + " saved your key to .env")
-    else:
-        print("   " + col(BOLD, "✓") + " using the AgentCall key already set")
+    write_env(key)
+    print("   " + col(BOLD, "✓") + (" copied your AgentCall key into .env" if reused else " saved your key to .env"))
 
     _done_card(name)
-    print("  " + col(BOLD, "Run it:") + '  python notetaker.py "https://meet.google.com/your-link"')
-    print("  " + col(DIM, "Edit config.jsonc anytime to change the name, face, or format · your key stays in .env."))
-    print("  " + col(DIM, "Custom on-camera image? Drop it in avatars/ and set DISPLAY to its name."))
-    print()
+    _next_steps()
 
 
 def main():
@@ -297,14 +321,16 @@ def main():
             ("md", "Markdown"), ("txt", "plain text"), ("json", "JSON"),
         ], "md")
 
-    if not (key or _existing_key()):
+    found = _existing_key()
+    effective = key or found
+    if not effective:
         print()
         print("  An AgentCall key is required — the notetaker can't run without one.")
         print("  Pass --key ak_ac_...  (free at app.agentcall.dev/api-keys),")
         print("  or set AGENTCALL_API_KEY, or add it to .env, then build again.")
         sys.exit(1)
 
-    assemble(name, display, fmt, key)
+    assemble(name, display, fmt, effective, reused=(not key and bool(found)))
 
 
 if __name__ == "__main__":
