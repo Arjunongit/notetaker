@@ -43,13 +43,18 @@ npm install
 ```
 > macOS / Linux: if `python` / `pip` aren't found, use `python3` / `pip3`.
 
-**3. Add your key** — grab a free one at [app.agentcall.dev/api-keys](https://app.agentcall.dev/api-keys),
-copy `.env.example` → `.env` (repo root), and paste it in. (Or `export AGENTCALL_API_KEY="ak_ac_..."`.)
+**3. Build it** 🛠 — the fun part:
 
-**4. Make it yours** — edit **[`config.jsonc`](config.jsonc)** at the repo root. That's the only file
-you touch: bot name, output format, the on-camera `DISPLAY`, and more — one config for both languages.
+```bash
+python build.py        # or:  npm run build
+```
 
-**5. Run it** — join the meeting first, then:
+It walks you through it — **name** your notetaker, pick its **face on camera** (pattern · ring ·
+transcript · or your own logo/photo), choose the **notes format**, and paste your free
+[AgentCall key](https://app.agentcall.dev/api-keys). It assembles your `config.jsonc` + `.env`.
+**You built it.** *(Prefer to do it by hand? Edit [`config.jsonc`](config.jsonc) yourself.)*
+
+**4. Run it** — join the meeting first, then:
 
 ```bash
 python notetaker.py "https://meet.google.com/your-link"

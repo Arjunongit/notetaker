@@ -25,6 +25,7 @@
   ],
   "type": "commonjs",
   "scripts": {
+    "build": "node build.js",
     "start": "node notetaker.js"
   },
   "dependencies": {

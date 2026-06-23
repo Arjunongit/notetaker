@@ -490,7 +490,7 @@ def run(meet_url, bot_name, display):
 
 def main():
     parser = argparse.ArgumentParser(description="A silent meeting notetaker (runs on the AgentCall bridge).")
-    parser.add_argument("meet_url", help="Google Meet / Zoom / Teams link")
+    parser.add_argument("meet_url", nargs="?", help="Google Meet / Zoom / Teams link")
     parser.add_argument("--name", default=CONFIG["BOT_NAME"], help="Bot display name")
     parser.add_argument("--format", default=CONFIG["OUTPUT_FORMAT"], choices=["md", "txt", "json"])
     parser.add_argument("--out", default=CONFIG["OUTPUT_DIR"], help="Folder to save notes in")
@@ -498,8 +498,16 @@ def main():
                         help="Serve a live transcript page (--no-web to disable)")
     parser.add_argument("--port", type=int, default=CONFIG["WEB_PORT"], help="Port for the web page")
     parser.add_argument("--display", default=CONFIG["DISPLAY"],
-                        help="Bot video tile: audio, pattern, transcript (or your own avatars/<name>.html)")
+                        help="Bot video tile: audio, pattern, ring, transcript, or your own (avatars/<name>.html or image)")
     args = parser.parse_args()
+
+    # Not built yet? Send them to the builder (the test harness bypasses this).
+    if not args.name and not os.environ.get("NOTETAKER_BRIDGE"):
+        print("\nYour notetaker isn't built yet — let's build it:\n   python build.py\n")
+        sys.exit(0)
+    if not args.meet_url:
+        print('Usage: python notetaker.py "<meeting-link>"     (build first: python build.py)')
+        sys.exit(0)
 
     CONFIG["OUTPUT_FORMAT"] = args.format
     CONFIG["OUTPUT_DIR"] = args.out

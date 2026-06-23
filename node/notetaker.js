@@ -383,9 +383,13 @@ function parseArgs(argv) {
 
 async function main() {
   const args = parseArgs(process.argv);
+  if (!args.name && !process.env.NOTETAKER_BRIDGE) {
+    console.log("\nYour notetaker isn't built yet — let's build it:\n   npm run build\n");
+    process.exit(0);
+  }
   if (!args.meetUrl) {
-    console.log('Usage: node notetaker.js "<meet-url>" [--name N] [--format md|txt|json] [--out DIR] [--web] [--port P] [--display audio|pattern|transcript]');
-    process.exit(1);
+    console.log('Usage: node notetaker.js "<meeting-link>"  [--name N] [--display audio|pattern|ring|transcript] [--format md|txt|json] [--out DIR] [--no-web] [--port P]');
+    process.exit(0);
   }
   if (!["md", "txt", "json"].includes(args.format)) {
     console.log(`Invalid --format "${args.format}". Use md, txt, or json.`);

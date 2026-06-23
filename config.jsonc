@@ -4,9 +4,11 @@
   //  One config, shared by both the Python and Node notetaker. (JSON + comments.)
   // ══════════════════════════════════════════════════════════════════════════
 
-  // The name people see in the meeting. Short & distinctive — speech-to-text
-  // mishears long names ("Notetaker" can come out as "No taker").
-  "BOT_NAME": "Scribe",
+  // Your notetaker's name. Run the builder to set this up interactively —
+  //   python build.py     (or)     npm run build
+  // — or just fill it in here. Short & distinctive (STT mishears long names:
+  // "Notetaker" can come out as "No taker"). Left blank = "not built yet".
+  "BOT_NAME": "",
 
   // Where notes are saved, and in what format. A relative path is saved at the
   // repo root, so notes/ sits next to python/ and node/ (shared by both).
