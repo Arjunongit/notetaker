@@ -119,14 +119,18 @@ def end_call(call_id):
     )
     for attempt in range(2):   # one quick retry; keep it short so shutdown stays fast
         try:
-            urlrequest.urlopen(req, timeout=5).read()
+            resp = urlrequest.urlopen(req, timeout=5)
+            resp.read()
+            print(f"  Call ended cleanly - DELETE /v1/calls/{call_id} -> {resp.getcode()}. Billing stopped.")
             return
         except Exception as e:
             if getattr(e, "code", None) == 404:   # already gone — billing is stopped
+                print(f"  Call already ended - DELETE /v1/calls/{call_id} -> 404. Billing stopped.")
                 return
             if attempt == 0:
                 time.sleep(0.5)
-    print("  (note: couldn't confirm the call stopped; the bot has left and the call expires on its own.)")
+    print(f"  (note: couldn't confirm the call stopped (call_id={call_id}); the bot has left and "
+          "the call expires on its own. You can DELETE it manually with that id if needed.)")
 
 
 def hhmmss(ts):
@@ -371,10 +375,15 @@ def run(meet_url, bot_name, display):
                 STATE["lines"] = STATE["lines"][-1000:]
         on_line(entry)
 
+    leave_logged = {"v": False}
+
     def send_leave():
         try:
             proc.stdin.write(json.dumps({"command": "leave"}) + "\n")
             proc.stdin.flush()
+            if not leave_logged["v"]:
+                print("  Sent the leave command to the bot (asking it to leave the meeting).")
+                leave_logged["v"] = True
         except Exception:
             pass
 
@@ -389,7 +398,10 @@ def run(meet_url, bot_name, display):
                 break
             et = ev.get("event") or ev.get("type") or ""
 
-            if et == "call.bot_ready":
+            if et == "call.created":
+                print(f"  Call created: {ev.get('call_id')}")
+
+            elif et == "call.bot_ready":
                 joined_at = datetime.now()
                 set_status("in meeting")
                 print("In the meeting. Listening...\n")
@@ -530,6 +542,10 @@ def main():
         print('    export AGENTCALL_API_KEY="ak_ac_..."')
         print('    or save {"api_key": "ak_ac_..."} to ~/.agentcall/config.json')
         sys.exit(1)
+
+    if not (CONFIG.get("ALONE_SECONDS") and CONFIG["ALONE_SECONDS"] > 0):
+        print("WARNING: ALONE_SECONDS is 0 in config.jsonc — the server-side auto-leave is OFF.")
+        print("         If a shutdown is interrupted, the bot could keep billing. Set ALONE_SECONDS > 0.")
 
     if CONFIG["WEB"]:
         srv, _ = serve_html(lambda: _read_html(os.path.join(_REPO_ROOT, "avatars", "transcript.html")), CONFIG["WEB_PORT"])

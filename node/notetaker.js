@@ -83,11 +83,14 @@ async function endCall(callId) {
     const t = setTimeout(() => ac.abort(), 5000);   // fetch has no default timeout — cap it
     try {
       const res = await fetch(`${API_BASE}/v1/calls/${callId}`, { method: "DELETE", headers: { Authorization: `Bearer ${API_KEY}` }, signal: ac.signal });
-      if (res.ok || res.status === 404) return;
+      if (res.ok || res.status === 404) {
+        console.log(`  Call ended cleanly - DELETE /v1/calls/${callId} -> ${res.status}. Billing stopped.`);
+        return;
+      }
     } catch { /* retry */ } finally { clearTimeout(t); }
     if (attempt === 0) await new Promise((r) => setTimeout(r, 500));
   }
-  console.log("  (note: couldn't confirm the call stopped; the bot has left and the call expires on its own.)");
+  console.log(`  (note: couldn't confirm the call stopped (call_id=${callId}); the bot has left and the call expires on its own. You can DELETE it manually with that id if needed.)`);
 }
 
 function localISO() {
@@ -247,7 +250,13 @@ async function run(meetUrl, botName, display) {
     const botLower = botName.toLowerCase();
 
     const setStatus = (s) => { STATE.bot = botName; STATE.status = s; STATE.present = present.size; };
-    const sendLeave = () => { try { proc.stdin.write(JSON.stringify({ command: "leave" }) + "\n"); } catch {} };
+    let leaveLogged = false;
+    const sendLeave = () => {
+      try {
+        proc.stdin.write(JSON.stringify({ command: "leave" }) + "\n");
+        if (!leaveLogged) { console.log("  Sent the leave command to the bot (asking it to leave the meeting)."); leaveLogged = true; }
+      } catch {}
+    };
 
     const record = (speaker, text, kind) => {
       const ts = localISO();
@@ -327,42 +336,49 @@ async function run(meetUrl, botName, display) {
 
     const rl = readline.createInterface({ input: proc.stdout });
     rl.on("line", (raw) => {
-      raw = raw.trim();
-      if (!raw) return;
-      let ev;
-      try { ev = JSON.parse(raw); } catch { return; }
-      const et = ev.event || ev.type || "";
+      try {
+        raw = raw.trim();
+        if (!raw) return;
+        let ev;
+        try { ev = JSON.parse(raw); } catch { return; }
+        const et = ev.event || ev.type || "";
 
-      if (et === "call.created") {
-        callId = ev.call_id;
-      } else if (et === "call.bot_ready") {
-        joinedAt = Date.now();
-        setStatus("in meeting");
-        console.log("In the meeting. Listening...\n");
-      } else if (et === "participant.joined" || et === "meeting.participant_joined") {
-        const name = ev.name || (ev.participant && ev.participant.name) || "";
-        if (name && name.toLowerCase() !== botLower) { present.add(name); seen.add(name); seenHuman = true; }
-        setStatus("in meeting");
-        console.log(`  + ${name || "someone"} joined (${present.size} here)`);
-      } else if (et === "participant.left" || et === "meeting.participant_left") {
-        const name = ev.name || (ev.participant && ev.participant.name) || "";
-        present.delete(name);
-        setStatus("in meeting");
-        console.log(`  - ${name || "someone"} left (${present.size} here)`);
-        if (CONFIG.LEAVE_WHEN_EMPTY && seenHuman && present.size === 0) {
-          console.log("\nEveryone left - leaving.");
-          endReason = "all_participants_left";
-          sendLeave();
+        if (et === "call.created") {
+          callId = ev.call_id;
+          console.log(`  Call created: ${callId}`);
+        } else if (et === "call.bot_ready") {
+          joinedAt = Date.now();
+          setStatus("in meeting");
+          console.log("In the meeting. Listening...\n");
+        } else if (et === "participant.joined" || et === "meeting.participant_joined") {
+          const name = ev.name || (ev.participant && ev.participant.name) || "";
+          if (name && name.toLowerCase() !== botLower) { present.add(name); seen.add(name); seenHuman = true; }
+          setStatus("in meeting");
+          console.log(`  + ${name || "someone"} joined (${present.size} here)`);
+        } else if (et === "participant.left" || et === "meeting.participant_left") {
+          const name = ev.name || (ev.participant && ev.participant.name) || "";
+          present.delete(name);
+          setStatus("in meeting");
+          console.log(`  - ${name || "someone"} left (${present.size} here)`);
+          if (CONFIG.LEAVE_WHEN_EMPTY && seenHuman && present.size === 0) {
+            console.log("\nEveryone left - leaving.");
+            endReason = "all_participants_left";
+            sendLeave();
+          }
+        } else if (et === "user.message") {
+          const text = (ev.text || "").trim();
+          if (text) { const speaker = ev.speaker || "Unknown"; record(speaker, text, "speech"); console.log(`  [${speaker}] ${text}`); }
+        } else if (et === "chat.received" && CONFIG.CAPTURE_CHAT) {
+          const message = (ev.message || "").trim();
+          if (message) { const sender = ev.sender || "Unknown"; record(sender, message, "chat"); console.log(`  [chat] ${sender}: ${message}`); }
+        } else if (et === "call.ended") {
+          endReason = ev.reason || endReason;
+          console.log(`\nCall ended: ${endReason}`);
+          finish(endReason);   // tear down now (send leave + DELETE) — don't wait for the bridge to exit
         }
-      } else if (et === "user.message") {
-        const text = (ev.text || "").trim();
-        if (text) { const speaker = ev.speaker || "Unknown"; record(speaker, text, "speech"); console.log(`  [${speaker}] ${text}`); }
-      } else if (et === "chat.received" && CONFIG.CAPTURE_CHAT) {
-        const message = (ev.message || "").trim();
-        if (message) { const sender = ev.sender || "Unknown"; record(sender, message, "chat"); console.log(`  [chat] ${sender}: ${message}`); }
-      } else if (et === "call.ended") {
-        endReason = ev.reason || endReason;
-        console.log(`\nCall ended: ${endReason}`);
+      } catch (e) {
+        console.error("notetaker: unexpected error while handling an event -", e && e.message);
+        finish("error");       // never let a thrown handler orphan the detached bridge
       }
     });
 
@@ -419,6 +435,11 @@ async function main() {
     console.log('    export AGENTCALL_API_KEY="ak_ac_..."');
     console.log('    or save {"api_key": "ak_ac_..."} to ~/.agentcall/config.json');
     process.exit(1);
+  }
+
+  if (!(CONFIG.ALONE_SECONDS > 0)) {
+    console.log("WARNING: ALONE_SECONDS is 0 in config.jsonc — the server-side auto-leave is OFF.");
+    console.log("         If a shutdown is interrupted, the bot could keep billing. Set ALONE_SECONDS > 0.");
   }
 
   if (CONFIG.WEB) {
