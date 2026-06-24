@@ -27,11 +27,17 @@ Two ways in — pick one:
 - 🖥️ **Run it yourself** — the four steps below.
 - 🤖 **Have an AI assistant do it** — on Claude Code, Cursor, Gemini CLI, or similar? [One prompt sets it all up.](#build-it-with-one-prompt)
 
-**1. Get it** — hit **"Use this template"** at the top of this page to make your own copy, then pick a language:
+**1. Get it on your computer.**
+
+Make your own copy on GitHub — **"Use this template" → "Create a new repository"**, or **Fork** it. *(Or skip that and clone this repo directly.)* Then clone it and open a terminal in the folder — use your repo's URL from the address bar:
 
 ```bash
-cd python      # ...or:  cd node
+git clone https://github.com/YOUR-USERNAME/notetaker
+cd notetaker
+cd python        # ...or:  cd node
 ```
+
+> Run these in a terminal — standalone, or your editor's built-in one (VS Code / Cursor: **Terminal → New Terminal**).
 
 **2. Install**
 
@@ -74,36 +80,44 @@ Admit the bot (~30–90s), talk, drop a chat message — and watch `notes/` fill
 
 ## Build it with one prompt
 
-🤖 **Using an AI coding assistant? Set up your notetaker with a single prompt.** Open this
-repo in [Claude Code](https://claude.com/claude-code), Cursor, Gemini CLI, or Windsurf and paste the
-prompt below. Your agent runs the same one-time setup — your key, a name, the on-camera face, the
-notes format — and hands you a working notetaker. **It's a starting point you can edit freely.**
-
-> You're set up in my **notetaker** repo — a silent meeting-notetaker that runs on AgentCall. It's
-> already complete: your job is to **configure and run it**, *not* to write a notetaker. Never modify
-> `notetaker.py` / `notetaker.js` or anything in `engine/`.
+> [!TIP]
+> **Using an AI coding assistant?** Give it two things and it does the rest — in any folder, no terminal for you:
+> 1. **Copy this repo's URL** — it's in your browser's address bar (e.g. `https://github.com/.../notetaker`).
+> 2. Paste that URL **and the prompt below** into [Claude Code](https://claude.com/claude-code), Cursor, Gemini CLI, or Windsurf.
 >
-> 1. Ask me: **Python or Node?** Then `cd` into that folder (`python/` or `node/`) and install deps —
->    Python: create and activate a venv, then `pip install -r requirements.txt`; Node: `npm install`.
-> 2. Ask me for my **AgentCall API key** (free at app.agentcall.dev/api-keys). If I already have
->    `AGENTCALL_API_KEY` exported or a `~/.agentcall/config.json`, use that and don't ask. A key is
->    **required** — never proceed without one.
-> 3. Ask me three quick things: a **name** (default: AgentCall); its **on-camera face** — `audio`
->    (no video, just listens), `pattern` (Pattern AI Labs logo), `ring`, `transcript`, or
->    `image` (my own logo/photo); and the **notes format** — `md`, `txt`, or `json`.
-> 4. Run the builder **once** with my answers — it writes a gitignored `.env` (the key) and
->    `config.jsonc` (the settings):
->    `python build.py --key <KEY> --name <NAME> --display <FACE> --format <FORMAT>`
->    (Node: `node build.js …`). If I already had a key set, omit `--key`. Show me the output.
-> 5. Tell me to join my meeting, then when I give you the link, run it:
->    `python notetaker.py "<MEET_LINK>"` (Node: `node notetaker.js "<MEET_LINK>"`).
->    `notes/` fills in live; the bot leaves when everyone else does.
->
-> If any step fails, **stop and show me the exact error** — don't guess or fake success. After this
-> one-time setup I can change any setting by editing `config.jsonc` directly.
+> It clones the repo, installs, builds, and runs it — you just answer a few questions in chat.
 
-Your agent copies, configures, and runs a tested notetaker — it never writes bot code, so there's
-nothing to debug later. Same result as doing it yourself — your assistant just runs the steps.
+**The prompt** — copy it (the button in the corner of the box) and paste it with your repo URL:
+
+```text
+You're going to set up and run a silent meeting notetaker that runs on AgentCall. It's already
+written and complete — your job is to get it, configure it, and run it, not to write a notetaker.
+Never modify notetaker.py / notetaker.js or anything in engine/. Run every command yourself —
+never tell me to run something in a terminal.
+
+1. Get the code. Clone the GitHub repo URL I gave you and work inside it: run
+   git clone <THE URL I PASTED>, then cd into the new folder. If I didn't give you a URL, ask me
+   for it first. (If build.py / build.js is already in this folder, skip the clone.)
+2. Python or Node? Ask me, then cd into that folder (python/ or node/) and install deps —
+   Python: create and activate a venv, then pip install -r requirements.txt; Node: npm install.
+3. Ask me for my AgentCall API key (free at app.agentcall.dev/api-keys). If AGENTCALL_API_KEY is
+   already set, or ~/.agentcall/config.json exists, use that and don't ask. A key is required —
+   never proceed without one.
+4. Ask me three quick things: a name (default: AgentCall); its on-camera face — audio (no video,
+   just listens), pattern (Pattern AI Labs logo), ring, transcript, or image (my own logo/photo);
+   and the notes format — md, txt, or json.
+5. Run the builder once with my answers — it writes a gitignored .env (the key) and config.jsonc
+   (the settings): python build.py --key <KEY> --name <NAME> --display <FACE> --format <FORMAT>
+   (Node: node build.js …). If I already had a key set, omit --key. Show me the output.
+6. Tell me to join my meeting; when I send the link, run it:
+   python notetaker.py "<MEET_LINK>"  (Node: node notetaker.js "<MEET_LINK>").
+   notes/ fills in live; the bot leaves when everyone else does.
+
+Do each step yourself, in order. If a step fails, stop and show me the exact error — don't guess
+or fake success. After this one-time setup I can change any setting by editing config.jsonc directly.
+```
+
+Your assistant clones, configures, and runs a tested notetaker — it never writes bot code, so there's nothing to debug later.
 
 ---
 
