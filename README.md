@@ -1,10 +1,11 @@
-# Meeting Notetaker
+# Build your own meeting notetaker
 
-A silent bot that joins your meeting, writes the transcript down **in real time**
-(speech *and* chat), shows it live in your browser, and leaves when everyone else does.
+Drop a bot into any Google Meet, Zoom, or Teams call and it quietly writes the whole thing down —
+every word and every chat message, live as it happens — then slips out when the meeting's over.
+It never talks. It just takes notes.
 
-That's all it does — **on purpose.** It's a clean base you fork and make your own.
-Python **or** Node, one config file. **Powered by [AgentCall](https://agentcall.dev).**
+And it's **yours**: fork it, name it, give it a face, and wire it into whatever you want next.
+Python **or** Node, one config file. Powered by **[AgentCall](https://agentcall.dev)**.
 
 ![License](https://img.shields.io/badge/license-MIT-blue) ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![Node](https://img.shields.io/badge/node-18%2B-green)
 
@@ -14,26 +15,25 @@ Python **or** Node, one config file. **Powered by [AgentCall](https://agentcall.
 
 - **Joins** a Google Meet / Zoom / Teams link as a named participant.
 - **Writes the transcript to a file in real time** — speech **and** chat (`.md` / `.txt` / `.json`).
-- **Shows it live** in your browser at `localhost:8080`.
-- **On-camera tile** (optional): the **Pattern AI Labs logo** or the **live transcript** — or just audio.
+- **Shows it live** — in your browser at `localhost:8080`, or right on screen in the call (the transcript tile).
+- **On-camera tile** (optional): customize the avatar it shows in the meeting — a logo, a pattern, the live transcript, or nothing at all.
 - **Leaves** the moment the last human leaves — never lingers in an empty room.
-- **Never speaks.** No AI, no summaries — fast and real-time.
 
 ---
 
 ## Setup
 
-**Two ways to set it up — pick whichever fits:**
-- 🖥️ **Do it yourself** — run the four steps below.
-- 🤖 **Let your AI assistant do it** — using Claude Code, Cursor, Gemini CLI, or similar? [Set it up with one prompt](#build-it-with-one-prompt) instead.
+Two ways in — pick one:
+- 🖥️ **Run it yourself** — the four steps below.
+- 🤖 **Have an AI assistant do it** — on Claude Code, Cursor, Gemini CLI, or similar? [One prompt sets it all up.](#build-it-with-one-prompt)
 
-**1. Get it** — "Use this template" / fork / clone this repo, then pick a language:
+**1. Get it** — hit **"Use this template"** at the top of this page to make your own copy, then pick a language:
 
 ```bash
 cd python      # ...or:  cd node
 ```
 
-**2. Install** — pick your language.
+**2. Install**
 
 *Python (3.10+):*
 ```bash
@@ -45,36 +45,29 @@ pip install -r requirements.txt
 ```bash
 npm install
 ```
-> The venv keeps these deps isolated — and on modern Linux/macOS a plain `pip install` is blocked
-> without one (PEP 668), so it's the reliable path everywhere. If `python` / `pip` aren't found, use `python3` / `pip3`.
+> The venv keeps deps isolated — and on modern Linux/macOS a plain `pip install` is blocked without
+> one (PEP 668). If `python` / `pip` aren't found, use `python3` / `pip3`.
 
-**3. Build it** 🛠 — the one-time setup that makes it *yours*:
+**3. Build it** 🛠 — a one-time wizard that makes it *yours*:
 
 ```bash
 python build.py        # or:  npm run build
 ```
 
-It asks a few quick questions — your free [AgentCall key](https://app.agentcall.dev/api-keys) **first**
-(it writes a gitignored `.env` for you), then a **name**, its **face on camera** (audio · pattern · ring ·
-transcript · or your own logo/photo), and the **notes format** — and assembles your `config.jsonc`.
-**You built it.**
+It asks a few quick things — your free [AgentCall key](https://app.agentcall.dev/api-keys) first (it
+writes a gitignored `.env`), a **name**, a **face on camera**, and the **notes format** — then fills in
+your `config.jsonc`. **You built it.**
 
-> **After this one-time build, just edit [`config.jsonc`](config.jsonc) directly** to change any
-> setting — the build is only for first-time setup. Your key stays in `.env` (gitignored, never committed).
+> Change anything later by editing [`config.jsonc`](config.jsonc) directly — the build is just for first-time setup.
 
-> **No terminal** — an AI agent (Claude Code, Cursor), CI, or a script? The builder detects it and won't
-> hang. Run it non-interactively with flags (a key is required):
-> `python build.py --key ak_ac_... --name Juno --display audio` (or `--image ./logo.png`) — the same
-> thing the [one-prompt setup](#build-it-with-one-prompt) does for you.
-
-**4. Run it** — join the meeting first, then:
+**4. Run it** — join the meeting yourself first, then:
 
 ```bash
 python notetaker.py "https://meet.google.com/your-link"
 #  or:  node notetaker.js "https://meet.google.com/your-link"
 ```
 
-Admit the bot (~30–90s), talk, drop a chat message — watch `notes/` fill in live and the page at
+Admit the bot (~30–90s), talk, drop a chat message — and watch `notes/` fill in live, plus the page at
 **http://localhost:8080**. To stop: **leave the meeting** (the bot follows) or press **Ctrl+C**.
 
 ---
@@ -163,12 +156,25 @@ Drop an HTML page `avatars/<name>.html` and set `DISPLAY` to `<name>`. Start fro
 
 ## Build on top
 
-This is a clean, minimal base, on purpose — fork it and make it yours: live summaries, email or
-Slack delivery, a database, a web UI, anything. There are two empty hooks at the top of the
-notetaker waiting for your own logic.
+A notetaker is just the starting point — the good part is making it yours.
 
-Building something bigger on it? It all runs on **[AgentCall](https://agentcall.dev)** — head there
-for the docs, examples, and full API. Whatever you want to build, you'll find what you need.
+**Make it your own repo.** Click **"Use this template"** at the top of the page and GitHub spins up a
+brand-new repo that's entirely yours — your name, your history, no strings back here. (Prefer the
+classic route? Clone it and push to a fresh repo — same result.) Either way you own the codebase:
+rename it, restyle the avatar, strip out what you don't need.
+
+**Then build something real on it.** The notetaker hands you every line the instant it's spoken, and
+the full transcript when the call ends — what happens next is up to you:
+
+- auto-email or Slack the notes the moment the meeting wraps
+- live summaries or action items as people talk
+- a searchable archive of every meeting in a database
+- a one-click web UI, so you never open a terminal
+- a Notion / Linear / CRM sync
+
+**Want to go beyond a notetaker?** It all rides on **[AgentCall](https://agentcall.dev)** — the meeting
+layer underneath: voice, video, avatars, the works. The docs, examples, and full API are right there.
+Whatever you can imagine for a meeting, that's where you build it.
 
 ---
 

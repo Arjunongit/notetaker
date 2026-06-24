@@ -196,38 +196,97 @@ function assemble(name, display, fmt, key, reused) {
   nextSteps();
 }
 
-async function interactive() {
-  const readline = require("readline/promises");
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  rl.on("SIGINT", () => { console.log("\n  Build cancelled."); process.exit(1); });
-  const prompt = async () => (await rl.question("  " + col(BOLD, "›") + " ")).trim();
-  const ask = async (question, hint = "", def = "") => {
+function askText(question, hint, def) {
+  // One text question on a fresh readline, so the arrow picker can own raw stdin between asks.
+  return new Promise((resolve) => {
+    const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
+    rl.on("SIGINT", () => { console.log("\n  Build cancelled."); process.exit(1); });
     console.log(`\n  ${col(BOLD, question)}` + (hint ? `  ${col(DIM, hint)}` : ""));
-    return (await prompt()) || def;
-  };
-  const choose = async (question, options, def) => {
-    console.log(`\n  ${col(BOLD, question)}`);
-    options.forEach(([key, desc], i) =>
-      console.log(`    ${col(BOLD, String(i + 1))}  ${key.padEnd(11)}${col(DIM, desc)}${key === def ? col(DIM, "  (default)") : ""}`));
-    const raw = await prompt();
-    const n = parseInt(raw, 10);
-    if (Number.isInteger(n) && n >= 1 && n <= options.length) return options[n - 1][0];
-    const m = options.find(([k]) => k.toLowerCase() === raw.toLowerCase());
-    return m ? m[0] : def;
-  };
+    rl.question("  " + col(BOLD, "›") + " ", (ans) => { rl.close(); resolve(((ans || "").trim()) || def); });
+  });
+}
 
+function chooseTyped(question, options, def) {
+  return new Promise((resolve) => {
+    const rl = require("readline").createInterface({ input: process.stdin, output: process.stdout });
+    rl.on("SIGINT", () => { console.log("\n  Build cancelled."); process.exit(1); });
+    console.log(`\n  ${col(BOLD, question)}`);
+    options.forEach(([k, d], i) =>
+      console.log(`    ${col(BOLD, String(i + 1))}  ${k.padEnd(11)}${col(DIM, d)}${k === def ? col(DIM, "  (default)") : ""}`));
+    rl.question("  " + col(BOLD, "›") + " ", (raw) => {
+      rl.close();
+      raw = (raw || "").trim();
+      const n = parseInt(raw, 10);
+      if (Number.isInteger(n) && n >= 1 && n <= options.length) return resolve(options[n - 1][0]);
+      const m = options.find(([k]) => k.toLowerCase() === raw.toLowerCase());
+      resolve(m ? m[0] : def);
+    });
+  });
+}
+
+function chooseArrows(question, options, def) {
+  return new Promise((resolve, reject) => {
+    const stdin = process.stdin;
+    if (!stdin.isTTY || !stdin.setRawMode) return reject(new Error("no raw tty"));
+    let idx = Math.max(0, options.findIndex(([k]) => k === def));
+    const n = options.length;
+    const width = 15 + Math.max(...options.map(([, d]) => d.length));
+    const rows = () => options.map(([k, d], i) => {
+      if (i !== idx) return "  " + "   " + k.padEnd(11) + col(DIM, d);
+      const s = " ▸ " + k.padEnd(11) + d;
+      return "  " + LIMEBG + ONLIME + s + " ".repeat(Math.max(0, width - s.length)) + R;
+    });
+    process.stdout.write(`\n  ${col(BOLD, question)}\n  ${col(DIM, "↑/↓ move · enter select")}\n`);
+    process.stdout.write(rows().join("\n") + "\n\x1b[?25l");
+    const prevRaw = stdin.isRaw;
+    stdin.setRawMode(true); stdin.resume();
+    const onData = (buf) => {
+      const s = buf.toString();
+      let act = null;
+      if (s === "\x1b[A" || s === "k") { idx = (idx - 1 + n) % n; act = "move"; }
+      else if (s === "\x1b[B" || s === "j") { idx = (idx + 1) % n; act = "move"; }
+      else if (/^[1-9]$/.test(s) && +s <= n) { idx = +s - 1; act = "move"; }
+      else if (s === "\r" || s === "\n") act = "enter";
+      else if (s === "\x03" || s === "\x1b") act = "cancel";
+      if (!act) return;
+      if (act === "move") {
+        process.stdout.write(`\x1b[${n}A`);
+        for (const r of rows()) process.stdout.write("\x1b[K" + r + "\n");
+        return;
+      }
+      stdin.removeListener("data", onData);
+      stdin.setRawMode(prevRaw || false); stdin.pause();
+      process.stdout.write(`\x1b[?25h\x1b[${n + 1}A\x1b[J`);
+      if (act === "cancel") { console.log("\n  Build cancelled."); process.exit(1); }
+      console.log(`    ${col(DIM, "›")} ${col(BOLD, options[idx][0])}`);
+      resolve(options[idx][0]);
+    };
+    stdin.on("data", onData);
+  });
+}
+
+async function choose(question, options, def) {
+  // Arrow-key picker on a real terminal; falls back to typed input everywhere else.
+  if (ANSI && process.stdin.isTTY && process.stdin.setRawMode) {
+    try { return await chooseArrows(question, options, def); }
+    catch (e) { if (process.env.NOTETAKER_DEBUG) console.log(col(DIM, `  (arrow picker unavailable: ${e.message} — using typed input)`)); }
+  }
+  return chooseTyped(question, options, def);
+}
+
+async function interactive() {
   console.log(col(DIM, "  A few quick questions and it's yours."));
   let key = "";
   if (existingKey()) {
     console.log("  " + col(BOLD, "✓") + col(DIM, " found your AgentCall key already set — using it."));
   } else {
     while (!key) {
-      key = await ask("First — paste your AgentCall key",
-                      "free at app.agentcall.dev/api-keys · Ctrl-C to cancel");
+      key = await askText("First — paste your AgentCall key",
+                          "free at app.agentcall.dev/api-keys · Ctrl-C to cancel", "");
       if (!key) console.log("  " + col(DIM, "A key is required to run the notetaker — paste it, or Ctrl-C to cancel."));
     }
   }
-  const name = await ask("Name your notetaker", "e.g. Juno · enter to keep AgentCall", "AgentCall");
+  const name = await askText("Name your notetaker", "e.g. Juno · enter to keep AgentCall", "AgentCall");
   const face = await choose("How should it show up on camera?", [
     ["audio", "no video — just listens"],
     ["pattern", "the Pattern AI Labs logo"],
@@ -237,13 +296,12 @@ async function interactive() {
   ], "audio");
   let display = face;
   if (face === "image") {
-    const ip = await ask("Where's your image?", "png · jpg · gif · svg · webp  (enter to skip)");
+    const ip = await askText("Where's your image?", "png · jpg · gif · svg · webp  (enter to skip)", "");
     display = ip ? copyImage(ip, name) : "pattern";
   }
   const fmt = await choose("How should it save the notes?", [
     ["md", "Markdown"], ["txt", "plain text"], ["json", "JSON"],
   ], "md");
-  rl.close();
   const found = existingKey();
   assemble(name, display, fmt, key || found, !key && !!found);
 }

@@ -124,7 +124,102 @@ def ask(question, hint="", default=""):
     return _prompt() or default
 
 
-def choose(question, options, default):
+def _opt_lines(options, idx, width):
+    """One rendered line per option; the selected row is a lime bar with a ▸ pointer."""
+    out = []
+    for i, (key, desc) in enumerate(options):
+        if i == idx:
+            inner = " ▸ " + key.ljust(11) + desc
+            out.append("  " + _LIMEBG + _ONLIME + inner + " " * max(0, width - len(inner)) + _R)
+        else:
+            out.append("  " + "   " + key.ljust(11) + col(DIM, desc))
+    return out
+
+
+def _read_key():
+    """Block for one keypress; return up | down | enter | cancel | num:<n> | other."""
+    if os.name == "nt":
+        import msvcrt
+        ch = msvcrt.getch()
+        if ch in (b"\x00", b"\xe0"):              # arrow / special-key prefix
+            return {b"H": "up", b"P": "down"}.get(msvcrt.getch(), "other")
+        if ch in (b"\r", b"\n"):
+            return "enter"
+        if ch == b"\x03":
+            return "cancel"
+        return ("num:" + ch.decode()) if ch.isdigit() else "other"
+    import select
+    ch = sys.stdin.read(1)
+    if ch == "\x1b":                              # ESC: arrow sequence, or bare ESC = cancel
+        if select.select([sys.stdin], [], [], 0.05)[0] and sys.stdin.read(1) == "[" \
+                and select.select([sys.stdin], [], [], 0.05)[0]:
+            return {"A": "up", "B": "down"}.get(sys.stdin.read(1), "other")
+        return "cancel"
+    if ch in ("\r", "\n"):
+        return "enter"
+    if ch == "\x03":
+        return "cancel"
+    return ("num:" + ch) if ch.isdigit() else "other"
+
+
+def _choose_arrows(question, options, default):
+    idx = next((i for i, (k, _) in enumerate(options) if k == default), 0)
+    n = len(options)
+    width = 15 + max(len(d) for _, d in options)
+    print(f"\n  {col(BOLD, question)}")
+    print(col(DIM, "  ↑/↓ move · enter select"))
+    for line in _opt_lines(options, idx, width):
+        print(line)
+
+    old, fd = None, None
+    if os.name != "nt":
+        import termios
+        import tty
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+    cancelled = False
+    try:
+        if old is not None:
+            tty.setcbreak(fd)
+        sys.stdout.write("\033[?25l")             # hide cursor
+        sys.stdout.flush()
+        while True:
+            k = _read_key()
+            if k == "up":
+                idx = (idx - 1) % n
+            elif k == "down":
+                idx = (idx + 1) % n
+            elif k.startswith("num:") and 1 <= int(k[4:]) <= n:
+                idx = int(k[4:]) - 1
+            elif k == "enter":
+                break
+            elif k == "cancel":
+                cancelled = True
+                break
+            else:
+                continue
+            sys.stdout.write(f"\033[{n}A")        # back to first row, repaint
+            for line in _opt_lines(options, idx, width):
+                sys.stdout.write("\033[K" + line + "\n")
+            sys.stdout.flush()
+    except KeyboardInterrupt:
+        cancelled = True
+    finally:
+        sys.stdout.write("\033[?25h")             # show cursor
+        sys.stdout.flush()
+        if old is not None:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    sys.stdout.write(f"\033[{n + 1}A\033[J")       # collapse the hint + rows
+    if cancelled:
+        print("\n  Build cancelled.")
+        sys.exit(1)
+    chosen = options[idx][0]
+    print(f"    {col(DIM, '›')} {col(BOLD, chosen)}")
+    return chosen
+
+
+def _choose_typed(question, options, default):
     print(f"\n  {col(BOLD, question)}")
     for i, (key, desc) in enumerate(options, 1):
         mark = col(DIM, "  (default)") if key == default else ""
@@ -136,6 +231,17 @@ def choose(question, options, default):
         if raw.lower() == key.lower():
             return key
     return default
+
+
+def choose(question, options, default):
+    # Arrow-key picker on a real terminal; falls back to typed input everywhere else.
+    if _ANSI and sys.stdin.isatty():
+        try:
+            return _choose_arrows(question, options, default)
+        except Exception as e:
+            if os.environ.get("NOTETAKER_DEBUG"):
+                print(col(DIM, f"  (arrow picker unavailable: {e} — using typed input)"))
+    return _choose_typed(question, options, default)
 
 
 def slug(name):
