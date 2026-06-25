@@ -1,11 +1,18 @@
 # Build your own meeting notetaker
 
+No more renting a closed notetaker bot that barges into your calls and keeps your transcripts on
+someone else's servers. **Build your own** — and shape every part of it to work exactly the way you want.
+
 Drop a bot into any Google Meet, Zoom, or Teams call and it quietly writes the whole thing down —
 every word and every chat message, live as it happens — then slips out when the meeting's over.
 It never talks. It just takes notes.
 
 And it's **yours**: fork it, name it, give it a face, and wire it into whatever you want next.
 Python **or** Node, one config file. Powered by **[AgentCall](https://agentcall.dev)**.
+
+<p align="center">
+  <img src="assets/notetaker-bot.gif" width="480" alt="A bot quietly taking notes all through a meeting">
+</p>
 
 ![License](https://img.shields.io/badge/license-MIT-blue) ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![Node](https://img.shields.io/badge/node-18%2B-green)
 
@@ -19,6 +26,10 @@ Python **or** Node, one config file. Powered by **[AgentCall](https://agentcall.
 - **On-camera tile** (optional): customize the avatar it shows in the meeting — a logo, a pattern, the live transcript, or nothing at all.
 - **Leaves** the moment the last human leaves — never lingers in an empty room.
 
+<p align="center">
+  <img src="assets/transcript.png" width="660" alt="The live transcript page — notes filling in as people talk">
+</p>
+
 ---
 
 ## Setup
@@ -29,15 +40,22 @@ Two ways in — pick one:
 
 **1. Get it on your computer.**
 
-Make your own copy on GitHub — **"Use this template" → "Create a new repository"**, or **Fork** it. *(Or skip that and clone this repo directly.)* Then clone it and open a terminal in the folder — use your repo's URL from the address bar:
+It lives in the **`built-with-agentcall`** repo, in the **`meeting-notetaker/`** folder. Grab it either way:
 
+*Clone everything (simplest):*
 ```bash
-git clone https://github.com/YOUR-USERNAME/notetaker
-cd notetaker
-cd python        # ...or:  cd node
+git clone https://github.com/pattern-ai-labs/built-with-agentcall
+cd built-with-agentcall/meeting-notetaker/python      # ...or:  .../node
+```
+*Just this folder (skip the other use-cases):*
+```bash
+git clone --filter=blob:none --sparse https://github.com/pattern-ai-labs/built-with-agentcall
+cd built-with-agentcall && git sparse-checkout set meeting-notetaker
+cd meeting-notetaker/python                           # ...or:  .../node
 ```
 
 > Run these in a terminal — standalone, or your editor's built-in one (VS Code / Cursor: **Terminal → New Terminal**).
+> Want it as your own project? It's MIT — clone it and push to a repo of your own. Yours to take.
 
 **2. Install**
 
@@ -82,7 +100,7 @@ Admit the bot (~30–90s), talk, drop a chat message — and watch `notes/` fill
 
 > [!TIP]
 > **Using an AI coding assistant?** Give it two things and it does the rest — in any folder, no terminal for you:
-> 1. **Copy this repo's URL** — it's in your browser's address bar (e.g. `https://github.com/.../notetaker`).
+> 1. **Copy this repo's URL** — it's in your browser's address bar (e.g. `https://github.com/pattern-ai-labs/built-with-agentcall`).
 > 2. Paste that URL **and the prompt below** into [Claude Code](https://claude.com/claude-code), Cursor, Gemini CLI, or Windsurf.
 >
 > It clones the repo, installs, builds, and runs it — you just answer a few questions in chat.
@@ -95,9 +113,10 @@ written and complete — your job is to get it, configure it, and run it, not to
 Never modify notetaker.py / notetaker.js or anything in engine/. Run every command yourself —
 never tell me to run something in a terminal.
 
-1. Get the code. Clone the GitHub repo URL I gave you and work inside it: run
-   git clone <THE URL I PASTED>, then cd into the new folder. If I didn't give you a URL, ask me
-   for it first. (If build.py / build.js is already in this folder, skip the clone.)
+1. Get the code. Clone the GitHub repo URL I gave you, then cd into this use-case's folder — it's a
+   monorepo, so the notetaker is in meeting-notetaker/: run git clone <THE URL I PASTED>, then
+   cd into the repo and into meeting-notetaker/. If I didn't give you a URL, ask me for it first.
+   (If build.py / build.js is already in the current folder, skip the clone.)
 2. Python or Node? Ask me, then cd into that folder (python/ or node/) and install deps —
    Python: create and activate a venv, then pip install -r requirements.txt; Node: npm install.
 3. Ask me for my AgentCall API key (free at app.agentcall.dev/api-keys). If AGENTCALL_API_KEY is
@@ -170,12 +189,11 @@ Drop an HTML page `avatars/<name>.html` and set `DISPLAY` to `<name>`. Start fro
 
 ## Build on top
 
-A notetaker is just the starting point — the good part is making it yours.
+A notetaker is where you *start*, not where you stop — the best part is making it your own.
 
-**Make it your own repo.** Click **"Use this template"** at the top of the page and GitHub spins up a
-brand-new repo that's entirely yours — your name, your history, no strings back here. (Prefer the
-classic route? Clone it and push to a fresh repo — same result.) Either way you own the codebase:
-rename it, restyle the avatar, strip out what you don't need.
+**Make it your own.** It's MIT — clone the `meeting-notetaker/` folder (or the whole repo), push it to
+a repo of your own, and it's yours: rename it, restyle the avatar, strip out what you don't need. No
+strings back here.
 
 **Then build something real on it.** The notetaker hands you every line the instant it's spoken, and
 the full transcript when the call ends — what happens next is up to you:
