@@ -8,7 +8,7 @@ No terminal (an AI agent, CI, a script)? Pass the answers as flags instead — k
     python build.py --key ak_ac_... --name Juno --display ring --format md
     python build.py --key ak_ac_... --image ./logo.png        # your own avatar
 
-Either way it writes .env (your key, gitignored) + config.jsonc at the repo root.
+Either way it writes .env (your key, gitignored) + config.jsonc into the project folder.
 After this one-time build you can just edit config.jsonc directly. Powered by AgentCall.
 """
 
@@ -25,8 +25,8 @@ except Exception:
     pass
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
-_AVATARS = os.path.join(_ROOT, "avatars")
+_PROJECT_ROOT = os.path.dirname(_HERE)
+_AVATARS = os.path.join(_PROJECT_ROOT, "avatars")
 _IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
 
 
@@ -282,7 +282,7 @@ def set_value(text, key, value):
 
 
 def write_config(name, display, fmt):
-    p = os.path.join(_ROOT, "config.jsonc")
+    p = os.path.join(_PROJECT_ROOT, "config.jsonc")
     with open(p, encoding="utf-8") as f:
         text = f.read()
     text = set_value(text, "BOT_NAME", name)
@@ -298,7 +298,7 @@ def _existing_key():
     k = os.environ.get("AGENTCALL_API_KEY", "").strip()
     if k:
         return k
-    p = os.path.join(_ROOT, ".env")
+    p = os.path.join(_PROJECT_ROOT, ".env")
     if os.path.isfile(p):
         try:
             with open(p, encoding="utf-8") as f:
@@ -325,7 +325,7 @@ def _existing_key():
 
 def write_env(key):
     """Write/refresh the gitignored .env: set AGENTCALL_API_KEY, keep any other lines."""
-    p = os.path.join(_ROOT, ".env")
+    p = os.path.join(_PROJECT_ROOT, ".env")
     keep = []
     if os.path.isfile(p):
         try:

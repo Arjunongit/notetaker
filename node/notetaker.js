@@ -16,13 +16,13 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const REPO_ROOT = path.dirname(__dirname); // config.jsonc, notes/, avatars/ and .env live here
+const PROJECT_ROOT = path.dirname(__dirname); // config.jsonc, notes/, avatars/ and .env live here
 
 function loadConfig() {
   // One config file, shared by python and node. JSON with // and /* */ comments —
   // strip them, then parse. Edit config.jsonc at the repo root; nothing else.
   try {
-    let text = fs.readFileSync(path.join(REPO_ROOT, "config.jsonc"), "utf-8");
+    let text = fs.readFileSync(path.join(PROJECT_ROOT, "config.jsonc"), "utf-8");
     text = text.replace(/("(?:\\.|[^"\\])*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, s) => (s ? s : ""));
     return JSON.parse(text);
   } catch (e) {
@@ -33,7 +33,7 @@ function loadConfig() {
 const CONFIG = loadConfig();
 
 function loadDotenv() {
-  for (const d of [REPO_ROOT, __dirname]) {
+  for (const d of [PROJECT_ROOT, __dirname]) {
     try {
       const txt = fs.readFileSync(path.join(d, ".env"), "utf-8");
       for (let line of txt.split("\n")) {
@@ -56,6 +56,7 @@ function onLine(entry) {}
 function onMeetingEnd(transcript, meta) {}
 
 const API_BASE = process.env.AGENTCALL_API_URL || "https://api.agentcall.dev";
+const DEBUG = !!process.env.NOTETAKER_DEBUG;   // NOTETAKER_DEBUG=1 prints every raw bridge event
 
 function loadApiKey() {
   if (process.env.AGENTCALL_API_KEY) return process.env.AGENTCALL_API_KEY;
@@ -78,19 +79,25 @@ function bridgeCommand(display) {
 
 async function endCall(callId) {
   if (!callId || !API_KEY) return;
-  for (let attempt = 0; attempt < 2; attempt++) {   // one quick retry; keep shutdown fast
+  let lastErr = "";
+  for (let attempt = 0; attempt < 2; attempt++) {   // one quick retry
     const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), 5000);   // fetch has no default timeout — cap it
+    const t = setTimeout(() => ac.abort(), 10000);   // ending a LIVE call can take a few seconds
     try {
       const res = await fetch(`${API_BASE}/v1/calls/${callId}`, { method: "DELETE", headers: { Authorization: `Bearer ${API_KEY}` }, signal: ac.signal });
-      if (res.ok || res.status === 404) {
+      if (res.ok || res.status === 404 || res.status === 409) {   // 404 = gone, 409 = "call already ended"
         console.log(`  Call ended cleanly - DELETE /v1/calls/${callId} -> ${res.status}. Billing stopped.`);
         return;
       }
-    } catch { /* retry */ } finally { clearTimeout(t); }
+      let body = "";
+      try { body = (await res.text()).trim().slice(0, 200); } catch {}
+      lastErr = `HTTP ${res.status}${body ? " - " + body : ""}`;
+    } catch (e) {
+      lastErr = e && e.name === "AbortError" ? "timeout (10s)" : ((e && e.message) || String(e));
+    } finally { clearTimeout(t); }
     if (attempt === 0) await new Promise((r) => setTimeout(r, 500));
   }
-  console.log(`  (note: couldn't confirm the call stopped (call_id=${callId}); the bot has left and the call expires on its own. You can DELETE it manually with that id if needed.)`);
+  console.log(`  (note: couldn't confirm the call stopped - ${lastErr} (call_id=${callId}); the bot has left and the call expires on its own. You can DELETE it manually with that id if needed.)`);
 }
 
 function localISO() {
@@ -116,7 +123,7 @@ class LiveNotes {
   constructor() {
     this.fmt = CONFIG.OUTPUT_FORMAT;
     let out = CONFIG.OUTPUT_DIR;
-    if (!path.isAbsolute(out)) out = path.join(REPO_ROOT, out);
+    if (!path.isAbsolute(out)) out = path.join(PROJECT_ROOT, out);
     fs.mkdirSync(out, { recursive: true });
     const iso = localISO();
     const stamp = iso.slice(0, 16).replace("T", "-").replace(":", "");
@@ -180,7 +187,7 @@ function imageHtml(imagePath) {
 
 function avatarProvider(display) {
   // avatars/<display>.html (an HTML tile) or avatars/<display>.<img> (a raw image).
-  const base = path.join(REPO_ROOT, "avatars", display);
+  const base = path.join(PROJECT_ROOT, "avatars", display);
   if (fs.existsSync(base + ".html")) return () => readHtml(base + ".html");
   for (const ext of Object.keys(IMAGE_MIME)) {
     if (fs.existsSync(base + ext)) return () => imageHtml(base + ext);
@@ -231,6 +238,7 @@ async function run(meetUrl, botName, display) {
     const [cmd, ...base] = bridgeCommand(display);
     const args = [...base, meetUrl, "--name", botName];
     if (CONFIG.ALONE_SECONDS > 0) args.push("--alone-timeout", String(CONFIG.ALONE_SECONDS));
+    if (CONFIG.VAD_TIMEOUT > 0) args.push("--vad-timeout", String(CONFIG.VAD_TIMEOUT));   // lower = snappier
     if (uiPort) args.push("--ui-port", String(uiPort));
     // detached: the bridge runs in its own process group so a terminal Ctrl-C hits
     // only us — we keep it alive long enough to report the call id and leave
@@ -342,6 +350,7 @@ async function run(meetUrl, botName, display) {
         let ev;
         try { ev = JSON.parse(raw); } catch { return; }
         const et = ev.event || ev.type || "";
+        if (DEBUG) console.log(`  [debug] ${raw}`);
 
         if (et === "call.created") {
           callId = ev.call_id;
@@ -443,7 +452,7 @@ async function main() {
   }
 
   if (CONFIG.WEB) {
-    const { srv } = await serveHtml(() => readHtml(path.join(REPO_ROOT, "avatars", "transcript.html")), CONFIG.WEB_PORT);
+    const { srv } = await serveHtml(() => readHtml(path.join(PROJECT_ROOT, "avatars", "transcript.html")), CONFIG.WEB_PORT);
     if (srv) console.log(`Live transcript: http://localhost:${CONFIG.WEB_PORT}\n`);
   }
 

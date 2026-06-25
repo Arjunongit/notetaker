@@ -29,13 +29,13 @@ except Exception:
     pass
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_REPO_ROOT = os.path.dirname(_HERE)  # config.jsonc, notes/, avatars/ and .env live here
+_PROJECT_ROOT = os.path.dirname(_HERE)  # config.jsonc, notes/, avatars/ and .env live here
 
 
 def _load_config():
     """Read config.jsonc from the repo root — one file, shared by python and node.
     It's JSON with // and /* */ comments; strip the comments, then parse."""
-    p = os.path.join(_REPO_ROOT, "config.jsonc")
+    p = os.path.join(_PROJECT_ROOT, "config.jsonc")
     try:
         with open(p, encoding="utf-8") as fh:
             text = fh.read()
@@ -52,7 +52,7 @@ CONFIG = _load_config()
 
 
 def _load_dotenv():
-    for d in (_REPO_ROOT, _HERE):
+    for d in (_PROJECT_ROOT, _HERE):
         p = os.path.join(d, ".env")
         if os.path.exists(p):
             try:
@@ -80,6 +80,7 @@ def on_meeting_end(transcript, meta):
 
 
 API_BASE = os.environ.get("AGENTCALL_API_URL") or "https://api.agentcall.dev"
+DEBUG = bool(os.environ.get("NOTETAKER_DEBUG"))   # NOTETAKER_DEBUG=1 prints every raw bridge event
 
 
 def load_api_key():
@@ -117,20 +118,30 @@ def end_call(call_id):
         f"{API_BASE}/v1/calls/{call_id}", method="DELETE",
         headers={"Authorization": f"Bearer {API_KEY}"},
     )
-    for attempt in range(2):   # one quick retry; keep it short so shutdown stays fast
+    last_err = ""
+    for attempt in range(2):   # one quick retry
         try:
-            resp = urlrequest.urlopen(req, timeout=5)
+            resp = urlrequest.urlopen(req, timeout=10)   # ending a LIVE call can take a few seconds
             resp.read()
             print(f"  Call ended cleanly - DELETE /v1/calls/{call_id} -> {resp.getcode()}. Billing stopped.")
             return
         except Exception as e:
-            if getattr(e, "code", None) == 404:   # already gone — billing is stopped
-                print(f"  Call already ended - DELETE /v1/calls/{call_id} -> 404. Billing stopped.")
+            code = getattr(e, "code", None)
+            if code in (404, 409):   # 404 = gone, 409 = "call already ended" — either way it's stopped
+                print(f"  Call already ended - DELETE /v1/calls/{call_id} -> {code}. Billing stopped.")
                 return
+            last_err = f"HTTP {code}" if code else f"{type(e).__name__}: {getattr(e, 'reason', e)}"
+            try:                                  # an HTTPError carries the API's error body
+                if hasattr(e, "read"):
+                    body = e.read().decode("utf-8", "replace").strip()
+                    if body:
+                        last_err += f" - {body[:200]}"
+            except Exception:
+                pass
             if attempt == 0:
                 time.sleep(0.5)
-    print(f"  (note: couldn't confirm the call stopped (call_id={call_id}); the bot has left and "
-          "the call expires on its own. You can DELETE it manually with that id if needed.)")
+    print(f"  (note: couldn't confirm the call stopped - {last_err} (call_id={call_id}); the bot has "
+          "left and the call expires on its own. You can DELETE it manually with that id if needed.)")
 
 
 def hhmmss(ts):
@@ -151,7 +162,7 @@ class LiveNotes:
         self.fmt = CONFIG["OUTPUT_FORMAT"]
         out = CONFIG["OUTPUT_DIR"]
         if not os.path.isabs(out):
-            out = os.path.join(_REPO_ROOT, out)
+            out = os.path.join(_PROJECT_ROOT, out)
         os.makedirs(out, exist_ok=True)
         stamp = datetime.now().strftime("%Y-%m-%d-%H%M")
         self.path = os.path.join(out, f"meeting-notes-{stamp}.{self.fmt}")
@@ -223,7 +234,7 @@ def _image_html(image_path):
 def _avatar_provider(display):
     """avatars/<display>.html (an HTML tile) or avatars/<display>.<img> (a raw
     image). Returns a function that yields the page HTML, or None if neither exists."""
-    base = os.path.join(_REPO_ROOT, "avatars", display)
+    base = os.path.join(_PROJECT_ROOT, "avatars", display)
     if os.path.exists(base + ".html"):
         return lambda: _read_html(base + ".html")
     for ext in _IMAGE_EXTS:
@@ -290,6 +301,8 @@ def run(meet_url, bot_name, display):
     cmd = bridge_command(display) + [meet_url, "--name", bot_name]
     if CONFIG["ALONE_SECONDS"] and CONFIG["ALONE_SECONDS"] > 0:
         cmd += ["--alone-timeout", str(CONFIG["ALONE_SECONDS"])]
+    if CONFIG.get("VAD_TIMEOUT") and CONFIG["VAD_TIMEOUT"] > 0:
+        cmd += ["--vad-timeout", str(CONFIG["VAD_TIMEOUT"])]   # pause after you stop talking; lower = snappier
     if ui_port:
         cmd += ["--ui-port", str(ui_port)]
 
@@ -393,10 +406,19 @@ def run(meet_url, bot_name, display):
     print("(press Ctrl+C, or leave the meeting, to make the bot leave)")
     try:
         while True:
-            ev = events.get()
+            try:
+                # Poll with a timeout so Ctrl-C is delivered within ~0.5s even during a
+                # quiet stretch. A blocking get() with no timeout swallows the interrupt
+                # on Windows until the next event arrives — that was the "Ctrl-C does
+                # nothing until I leave the meeting" bug.
+                ev = events.get(timeout=0.5)
+            except queue.Empty:
+                continue
             if ev is None:
                 break
             et = ev.get("event") or ev.get("type") or ""
+            if DEBUG:
+                print(f"  [debug] {json.dumps(ev, ensure_ascii=False)}")
 
             if et == "call.created":
                 print(f"  Call created: {ev.get('call_id')}")
@@ -462,26 +484,29 @@ def run(meet_url, bot_name, display):
             except KeyboardInterrupt:
                 pass
             call_id = box["call_id"]
-        # End the bridge (it runs in its own process group, so end it explicitly).
-        # This always runs, even on a Ctrl-C during the wait.
+        # Stop billing FIRST. DELETE ends the call now, while it's still live, so it
+        # reliably returns 200 — deleting only after the bridge has already torn the
+        # call down can miss it. Ending the call also makes the bridge exit promptly,
+        # so we don't sit waiting on it (that wait is what made Ctrl-C feel frozen). A
+        # Ctrl-C here just exits — the server-side alone-timeout reclaims the call.
+        try:
+            end_call(call_id)
+        except KeyboardInterrupt:
+            pass
+        # Now close out the bridge. It exits on its own once the call ends (it's in its
+        # own process group, so close it explicitly); kill it if it lingers.
         try:
             proc.stdin.close()
         except Exception:
             pass
         try:
-            proc.wait(timeout=8)
+            proc.wait(timeout=5)
         except (Exception, KeyboardInterrupt):
             try:
                 proc.kill()
                 proc.wait(timeout=4)
             except Exception:
                 pass
-        # Stop billing (best-effort, quick). A Ctrl-C here just exits — the bridge's
-        # alone-timeout reclaims the call — so shutdown never hangs or loops.
-        try:
-            end_call(call_id)
-        except KeyboardInterrupt:
-            pass
         set_status("ended")
         duration = "unknown"
         if joined_at:
@@ -548,7 +573,7 @@ def main():
         print("         If a shutdown is interrupted, the bot could keep billing. Set ALONE_SECONDS > 0.")
 
     if CONFIG["WEB"]:
-        srv, _ = serve_html(lambda: _read_html(os.path.join(_REPO_ROOT, "avatars", "transcript.html")), CONFIG["WEB_PORT"])
+        srv, _ = serve_html(lambda: _read_html(os.path.join(_PROJECT_ROOT, "avatars", "transcript.html")), CONFIG["WEB_PORT"])
         if srv:
             print(f"Live transcript: http://localhost:{CONFIG['WEB_PORT']}\n")
 

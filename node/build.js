@@ -9,15 +9,15 @@
  *     node build.js --key ak_ac_... --name Juno --display ring --format md
  *     node build.js --key ak_ac_... --image ./logo.png        # your own avatar
  *
- * Either way it writes .env (your key, gitignored) + config.jsonc at the repo root.
+ * Either way it writes .env (your key, gitignored) + config.jsonc into the project folder.
  * After this one-time build you can just edit config.jsonc directly. Powered by AgentCall.
  */
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const ROOT = path.dirname(__dirname);
-const AVATARS = path.join(ROOT, "avatars");
+const PROJECT_ROOT = path.dirname(__dirname);
+const AVATARS = path.join(PROJECT_ROOT, "avatars");
 const IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"];
 
 // ── terminal styling (ANSI on a TTY; plain text otherwise) ─────────────────────
@@ -127,7 +127,7 @@ function setValue(text, key, value) {
 }
 
 function writeConfig(name, display, fmt) {
-  const p = path.join(ROOT, "config.jsonc");
+  const p = path.join(PROJECT_ROOT, "config.jsonc");
   let text = fs.readFileSync(p, "utf-8");
   text = setValue(text, "BOT_NAME", name);
   text = setValue(text, "DISPLAY", display);
@@ -141,7 +141,7 @@ function existingKey() {
   const env = (process.env.AGENTCALL_API_KEY || "").trim();
   if (env) return env;
   try {
-    for (let line of fs.readFileSync(path.join(ROOT, ".env"), "utf-8").split("\n")) {
+    for (let line of fs.readFileSync(path.join(PROJECT_ROOT, ".env"), "utf-8").split("\n")) {
       line = line.trim();
       if (line.startsWith("AGENTCALL_API_KEY=")) {
         const v = line.slice(line.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "");
@@ -158,7 +158,7 @@ function existingKey() {
 
 function writeEnv(key) {
   // Write/refresh the gitignored .env: set AGENTCALL_API_KEY, keep any other lines.
-  const p = path.join(ROOT, ".env");
+  const p = path.join(PROJECT_ROOT, ".env");
   let keep = [];
   try {
     keep = fs.readFileSync(p, "utf-8").split("\n").map((l) => l.replace(/\r$/, ""))
