@@ -1,7 +1,7 @@
-# Build your own meeting notetaker
+# Meeting Notetaker
 
-No more renting a closed notetaker bot that barges into your calls and keeps your transcripts on
-someone else's servers. **Build your own** — and shape every part of it to work exactly the way you want.
+**Build your own notetaker.** No more renting a closed bot that barges into your calls and keeps your
+transcripts on someone else's servers — build your own, and shape every part of it to work exactly the way you want.
 
 Drop a bot into any Google Meet, Zoom, or Teams call and it quietly writes the whole thing down —
 every word and every chat message, live as it happens — then slips out when the meeting's over.
@@ -27,8 +27,10 @@ Python **or** Node, one config file. Powered by **[AgentCall](https://agentcall.
 - **Leaves** the moment the last human leaves — never lingers in an empty room.
 
 <p align="center">
-  <img src="assets/transcript.png" width="660" alt="The live transcript page — notes filling in as people talk">
+  <img src="assets/meetview.png" width="49%" alt="The notetaker bot sitting in your meeting" />
+  <img src="assets/transcript.png" width="49%" alt="Your notes filling in live as people talk" />
 </p>
+<p align="center"><sub>The bot joins your call <b>(left)</b> — your notes write themselves, live <b>(right)</b>.</sub></p>
 
 ---
 
