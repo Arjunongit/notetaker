@@ -11,7 +11,7 @@ And it's **yours**: fork it, name it, give it a face, and wire it into whatever 
 Python **or** Node, one config file. Powered by **[AgentCall](https://agentcall.dev)**.
 
 <p align="center">
-  <img src="assets/notetaker-bot.gif" width="480" alt="A bot quietly taking notes all through a meeting">
+  <img src="assets/notetaker-bot.gif" width="100%" alt="Build your own notetaker with AgentCall — a bot quietly taking notes all through a meeting">
 </p>
 
 ![License](https://img.shields.io/badge/license-MIT-blue) ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![Node](https://img.shields.io/badge/node-18%2B-green)
