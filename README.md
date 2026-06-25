@@ -1,7 +1,7 @@
 # Meeting Notetaker
 
-**Build your own notetaker.** No more renting a closed bot that barges into your calls and keeps your
-transcripts on someone else's servers — build your own, and shape every part of it to work exactly the way you want.
+**Build your own notetaker.** No more renting a closed, locked-down bot you can't open up or change —
+build your own, own the code, and make it do exactly what you want.
 
 Drop a bot into any Google Meet, Zoom, or Teams call and it quietly writes the whole thing down —
 every word and every chat message, live as it happens — then slips out when the meeting's over.
@@ -191,7 +191,7 @@ Drop an HTML page `avatars/<name>.html` and set `DISPLAY` to `<name>`. Start fro
 
 ## Build on top
 
-A notetaker is where you *start*, not where you stop — the best part is making it your own.
+**Start here for free, then build on top.** A notetaker is where you start, not where you stop — the best part is making it your own.
 
 **Make it your own.** It's MIT — clone the `meeting-notetaker/` folder (or the whole repo), push it to
 a repo of your own, and it's yours: rename it, restyle the avatar, strip out what you don't need. No
